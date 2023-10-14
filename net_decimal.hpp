@@ -4,7 +4,8 @@ class net_decimal {
 public:
     bool modulus_mode = false;
 
-    uint64_t division_precision = 32;
+    uint64_t division_precision = 32,
+             binary_bit_count   = 0;
 
 protected:
     void value_assign(const net_decimal &src) {
@@ -55,6 +56,19 @@ protected:
             den = dec_e10(e10, den);
             num = dec_mul(e10, num);
         }
+    }
+
+    bool sin_cos_period(net_decimal &src) const {
+        net_decimal pi_2;
+        pi_2.num = dec_init(pi_2.sgn, 2);
+        pi_2.num = dec_mul(pi_2.num, net_decimal_pi.get(division_precision * 2));
+        if (*this <= pi_2) return false;
+        auto tmp {*this / pi_2};
+        dec_float_part(tmp.num, dec_div(tmp.num, tmp.den, 4));
+        tmp.den.reset();
+        src = *this - tmp * pi_2;
+        src.division_precision = division_precision;
+        return true;
     }
 
 public:
@@ -177,22 +191,7 @@ public:
     }
 
     net_decimal exp() const {
-        /*
-        auto src = 216_d,
-             fra = 0.5_d;
-        auto cnt = 0ull;
-        while (src > 10) {
-            src *= fra;
-            ++cnt;
-        }
-        auto src_prec = src.division_precision,
-             src_fold = (uint64_t)std::log2(cnt);
-        for (auto i = 0; i < src_fold; ++i) src.division_precision += src.division_precision;
-        auto ans = src.exp();
-        for (auto i = 0ull; i < cnt; ++i) ans *= ans;
-        ans.division_precision = src_prec;
-        ans.truncate();
-        */
+        // TODO optimize procedure
         net_decimal ans;
         if (is_zero()) {
             ans.num = dec_init(ans.sgn, 1);
@@ -204,6 +203,8 @@ public:
 
     net_decimal sin() const {
         // TODO inducing formula
+        net_decimal src;
+        if (sin_cos_period(src)) return src.sin();
         net_decimal ans;
         auto b  = dec_init(ans.sgn, 1),
              u  = num,
@@ -214,19 +215,13 @@ public:
 
     net_decimal cos() const {
         // TODO inducing formula
-        net_decimal ans,
-                    pi_2;
+        net_decimal src;
+        if (sin_cos_period(src)) return src.cos();
+        net_decimal ans;
         auto b = dec_init(ans.sgn, 0),
              u = dec_init(ans.sgn, 1),
              v = u;
-        pi_2.num = net_decimal_pi.get(division_precision * 2);
-        if (*this > pi_2) {
-            auto src {*this},
-                 tmp {src / pi_2};
-            dec_float_part(ans.num, dec_div(tmp.num, tmp.den, 4));
-            src -= ans * pi_2;
-            ans.num = dec_sin_cos(ans.sgn, src.num, src.den, sgn, u, v, b, division_precision);
-        } else ans.num = dec_sin_cos(ans.sgn, num, den, sgn, u, v, b, division_precision);
+        ans.num = dec_sin_cos(ans.sgn, num, den, sgn, u, v, b, division_precision);
         return ans;
     }
 
@@ -394,7 +389,7 @@ public:
         }
         if (!divd_dec && divr_dec) {
             ans.num = divd.num;
-            ans.den = dec_mul(divd.den, divr.den);
+            ans.den = dec_mul(divd.den, divr.num);
             return ans;
         }
         ans.num = dec_mul(divd.num, divr.den);

@@ -331,15 +331,12 @@ int main(int argc, char *argv[], char *envp[]) {
     // 1135147821456932545178 9632515584713416829 117.84541758316865039744481535232
     // 114079544040094610408604012404100840414.00009900130640449040000000800644024400114106186156
     
-    // auto s = false;
-    // auto a = dec_init(s, "1135147821456932545178"),
-    //      b = dec_init(s,    "9632515584713416829");
-    // auto c = dec_rem(a, b);
-    // cout << dec_to_string(false, c) << endl;
-    // cout << dec_to_string(false, a) << endl;
-    // auto c = dec_gcd(a, b);
-    // if (c) cout << dec_to_string(false, b) << endl;
-    // else cout << dec_to_string(false, a) << endl;
+    auto s = false;
+    auto a = dec_init(s, "1135147821456932545178"),
+         b = dec_init(s,    "9632515584713416829");
+    auto c = dec_rem(a, b);
+    cout << c << endl;
+    cout << a << endl;
 
     // net_decimal::division_precision = 130;
     // auto pi_val = net_decimal::pi();
@@ -421,16 +418,16 @@ int main(int argc, char *argv[], char *envp[]) {
     // while (dig_cnt--) ans *= 10;
     // cout << ans << endl;
 
-    auto sgn  = false;
-    auto test = dec_init(sgn, "324938271560444852566064687276808488928"),
-         four = dec_init(sgn, 4);
-    cout << dec_div_test(test, four, 0) << endl;
+    // auto sgn  = false;
+    // auto test = dec_init(sgn, "324938271560444852566064687276808488928"),
+    //      four = dec_init(sgn, 4);
+    // cout << dec_div_test(test, four, 0) << endl;
 
-    uint64_t test_round = 10000000;
-    auto test_time = NEUNET_CHRONO_TIME_POINT;
-    for (auto i = 0ull; i < test_round; ++i) dec_div_test(test, four, 0);
-    auto test_end = NEUNET_CHRONO_TIME_POINT;
-    cout << "[normal][" << test_round << "][" << test_end - test_time << "ms]" << std::endl;
+    // uint64_t test_round = 10000000;
+    // auto test_time = NEUNET_CHRONO_TIME_POINT;
+    // for (auto i = 0ull; i < test_round; ++i) dec_div_test(test, four, 0);
+    // auto test_end = NEUNET_CHRONO_TIME_POINT;
+    // cout << "[normal][" << test_round << "][" << test_end - test_time << "ms]" << std::endl;
 
     cout << '\n' << (NEUNET_CHRONO_TIME_POINT - ch_tm_pt) << "ms" << endl;
     return EXIT_SUCCESS;

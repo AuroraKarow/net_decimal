@@ -67,6 +67,308 @@ net_decimal_data dec_div(bool &ans_sgn, const net_decimal_data &divd, bool divd_
     return dec_div(divd, divr, prec);
 }
 
+/** 
+ * @brief Left shift
+ * @param src   [IO]    source
+ * @param bit   [In]    shift count
+ * @param sta   [In]    bit stability
+ */
+void dec_bit_lsh(net_decimal_data &src, uint64_t bit = 1, bool sta = false){
+    if (src.ft.length || !src.it.length) return;
+    uint64_t b = bit % NEUNET_DEC_DIG_MAX,
+             B = bit / NEUNET_DEC_DIG_MAX,
+             l = src.it.length,
+             T = 0,
+             t;
+    if (!sta && (B || src.it[l - 1] >= (NEUNET_DEC_SEG_MAX >> b))) src.it.init(l + (bit / 63) + 1);
+    if (src.it[l - 1] >= (NEUNET_DEC_SEG_MAX >> b)) l++;
+    // std::cout << "S" << std::endl;
+    if (b){
+        uint64_t bas = NEUNET_DEC_SEG_MAX >> b;
+        for(uint64_t m = 0; m < l; m++) {
+            t = src.it[m] / bas;
+            src.it[m] %= bas;
+            src.it[m] <<= b;
+            src.it[m] += T;
+            T = t;
+        }
+    }
+    // std::cout << "A" << std::endl;
+    uint64_t Bas = NEUNET_DEC_SEG_MAX >> NEUNET_DEC_DIG_MAX;
+    while (B--){
+        T = 0;
+        for(uint64_t m = 0; m < src.it.length; m++) {
+            t = src.it[m] / Bas;
+            src.it[m] %= Bas;
+            src.it[m] <<= NEUNET_DEC_DIG_MAX;
+            src.it[m] += T;
+            T = t;
+        }
+    }
+    l = src.it.length;
+    // std::cout << "B" << std::endl;
+    if (!sta) {
+        while(!src.it[--l]) continue;
+        src.it = src.it.sub_set(0, l);
+    }
+}
+
+/**
+ * @brief Right shift
+ * @param src   [IO]    source
+ * @param bit   [In]    shift count
+ * @param sta   [In]    bit stability
+ */
+void dec_bit_rsh(net_decimal_data &src, uint64_t bit = 1, bool sta = false){
+    if (src.ft.length || !src.it.length) return;
+    uint64_t b = bit % NEUNET_DEC_DIG_MAX,
+             B = bit / NEUNET_DEC_DIG_MAX,
+             l = src.it.length,
+             T = 0,
+             t;
+    // std::cout << "S" << std::endl;
+    if (b){
+        uint64_t bas = NEUNET_DEC_SEG_MAX >> b,
+                 div = 1 << b;
+        for(uint64_t m = l; m > 0; m--) {
+            t = (src.it[m - 1] % div) * bas;
+            src.it[m - 1] >>= b;
+            src.it[m - 1] += T;
+            T = t;
+        }
+    }
+    // std::cout << "A" << std::endl;
+    uint64_t Bas = NEUNET_DEC_SEG_MAX >> NEUNET_DEC_DIG_MAX,
+             Div = 1 << NEUNET_DEC_DIG_MAX;
+    while (B--){
+        T = 0;
+        for(uint64_t m = l; m > 0; m--) {
+            t = (src.it[m - 1] % Div) * Bas;
+            src.it[m - 1] >>= NEUNET_DEC_DIG_MAX;
+            src.it[m - 1] += T;
+            T = t;
+        }
+    }
+    // std::cout << "B" << std::endl;
+    if (!sta) {
+        while(!src.it[--l]) continue;
+        src.it = src.it.sub_set(0, l);
+    }
+}
+
+void dec_bit_lsh1(net_decimal_data &src, bool sta = false){
+    if (src.ft.length || !src.it.length) return;
+    if (!sta && src.it[src.it.length - 1] >= NEUNET_DEC_BIT_BAS) src.it.init(src.it.length + 1);
+    int t = 0;
+    for(uint64_t m = 0; m < src.it.length; m++) if(src.it[m] >= NEUNET_DEC_BIT_BAS) {
+        src.it[m] -= NEUNET_DEC_BIT_BAS;
+        src.it[m] <<= 1;
+        src.it[m] += t;
+        t = 1;
+    } else {
+        src.it[m] <<= 1;
+        src.it[m] += t;
+        t = 0;
+    }
+}
+
+void dec_bit_rsh1(net_decimal_data &src, bool sta = false){
+    if (src.ft.length || !src.it.length) return;
+    //if (!(src.it.length - 1)) src.it[0] >>= 1; return;
+    uint64_t t = 0;
+    for(uint64_t m = src.it.length; m > 0; m--) if(src.it[m - 1] % 2 == 1){ 
+        src.it[m - 1] >>= 1;
+        src.it[m - 1] += t;
+        t = NEUNET_DEC_BIT_BAS;
+    } else{
+        src.it[m - 1] >>= 1;
+        src.it[m - 1] += t;
+        t = 0;
+    }
+    if (!sta && !src.it[src.it.length - 1]) src.it.length - 1 ? src.it[src.it.length - 2] < NEUNET_DEC_BIT_TOP ? src.it.init(src.it.length - 1, true) : src.it.init(src.it.length, true) : src.it.init(src.it.length - 1, true);
+}
+
+// kp
+net_decimal_data dec_bit_k0(bool sgn = false) { return dec_init(sgn, 0); }
+// k, k1
+net_decimal_data dec_bit_k1(bool sgn = false) { return dec_init(sgn, 1); }
+
+uint64_t dec_bit_cnt(net_decimal_data &src){
+    uint64_t b = 0;
+    auto K = src,
+         k = dec_bit_k0();
+    while(dec_comp(k, K) != NEUNET_DEC_CMP_EQL){ 
+        dec_bit_rsh1(K);
+        b++;
+    }
+    return b;
+}
+
+/**
+ * @brief Binary not
+ * @param src       [IO]    source
+ * @param comple    [In]    one's complement
+ * @param bit       [In]    lower bit count, minimum is the bit count of source value
+ * @param sgn       [In]    Sign of source
+ */
+void dec_bit_not(net_decimal_data &src, bool comple = false, uint64_t bit = 0, bool sgn = false) {
+    auto k0 = dec_bit_k0(),
+         k1 = dec_bit_k1(),
+         k  = k0,
+         K  = k1;
+    auto b  = 0;
+    auto k_sgn = false;
+    if (dec_comp(src, k0) == NEUNET_DEC_CMP_EQL && !bit) {src = std::move(k1); return;}
+    if (comple && !sgn) return;
+    while(dec_comp(src, k0) != NEUNET_DEC_CMP_EQL || b < bit){
+        if (src.it.length || !(src.it.length - 1) && src.it[0] != 0) { if (!(src.it[0] % 2)) k = dec_add(k_sgn, k, false, k1, false); }
+        else if (!src.it.length) k = dec_add(k_sgn, k, false, k1, false);
+        dec_bit_lsh1(k1);
+        dec_bit_rsh1(src);
+        b++;
+    }
+    if (comple) {
+        k = dec_add(k_sgn, k, false, K, false);
+        if (sgn) { if (dec_comp(k, k1) != NEUNET_DEC_CMP_LES) { dec_bit_lsh1(k1); } k = dec_add(k_sgn, k, false, k1, false); }
+    }
+    else if (!sgn) k = dec_add(k_sgn, k, false, k1, false);
+    /*
+    while(dec_comp(D1, k0) != NEUNET_DEC_CMP_EQL){
+        if(!(D1.it[0] % 2)){ k = dec_add(sgn, k, sgn, kp, sgn); }
+        dec_bit_lsh_one(kp);
+        dec_bit_rsh_one(D1);
+    }
+    */
+    src = std::move(k);
+}
+
+/**
+ * @brief Binary not
+ * @param fst   [In]    first source
+ * @param snd   [In]    second source
+ * @param sgn1  [In]    first source sign
+ * @param sgn2  [In]    second source sign
+ * @param bit   [In]    lower bit count, minimum is the bit count of sources value
+ */
+net_decimal_data dec_bit_and(const net_decimal_data &fst, const net_decimal_data &snd, bool sgn1 = false, bool sgn2 = false, uint64_t bit = 0) {
+    auto D  = fst,
+         d  = snd,
+         k0 = dec_bit_k0(),
+         k1 = dec_bit_k1(),
+         k  = k0;
+    auto b  = 0;
+    auto k_sgn = false;
+    if (!bit) {
+        auto a = dec_bit_cnt(D),
+             b = dec_bit_cnt(d);
+        bit = std::max(a, b);
+    }
+    if (sgn1) dec_bit_not(D, true, bit, true);
+    if (sgn2) dec_bit_not(d, true, bit, true);
+    while(dec_comp(d, k0) != NEUNET_DEC_CMP_EQL || dec_comp(D, k0) != NEUNET_DEC_CMP_EQL || b < bit){
+        if (!(!D.it.length || !d.it.length)) if (D.it[0] % 2 && d.it[0] % 2) k = dec_add(k_sgn, k, false, k1, false);
+        dec_bit_lsh1(k1);
+        dec_bit_rsh1(D);
+        dec_bit_rsh1(d);
+        b++;
+    }
+    /*
+    while(dec_comp(d1, k0) != NEUNET_DEC_CMP_EQL && dec_comp(D1, k0) != NEUNET_DEC_CMP_EQL){
+        if(D1.it[0] % 2 && d1.it[0] % 2){ k = dec_add(sgn, k, sgn, kp, sgn); }
+        dec_bit_lsh_one(kp);
+        dec_bit_rsh_one(D1);
+        dec_bit_rsh_one(d1);
+    }
+    */
+    return k;
+}
+
+/**
+ * @brief Binary not
+ * @param fst   [In]    first source
+ * @param snd   [In]    second source
+ * @param sgn1  [In]    first source sign
+ * @param sgn2  [In]    second source sign
+ * @param bit   [In]    lower bit count, minimum is the bit count of sources value
+ */
+net_decimal_data dec_bit_or(const net_decimal_data &fst, const net_decimal_data &snd, bool sgn1 = false, bool sgn2 = false, uint64_t bit = 0) {
+    auto D  = fst,
+         d  = snd,
+         k0 = dec_bit_k0(),
+         k1 = dec_bit_k1(),
+         k  = k0;
+    auto b  = 0;
+    auto k_sgn = false;
+    if (!bit) {
+        auto a = dec_bit_cnt(D),
+             b = dec_bit_cnt(d);
+        bit = a > b ? a : b;
+    }
+    if (sgn1) dec_bit_not(D, true, bit, true);
+    if (sgn2) dec_bit_not(d, true, bit, true);
+    while(dec_comp(d, k0) != NEUNET_DEC_CMP_EQL || dec_comp(D, k0) != NEUNET_DEC_CMP_EQL || b < bit){
+        if (!(!D.it.length || !d.it.length)) { if((D.it[0] % 2) || (d.it[0] % 2)) k = dec_add(k_sgn, k, true, k1, true); }
+        else if (!D.it.length) { if (d.it[0] % 2) k = dec_add(k_sgn, k, false, k1, false); }
+        else if (!d.it.length) { if (D.it[0] % 2) k = dec_add(k_sgn, k, false, k1, false); }
+        dec_bit_lsh1(k1);
+        dec_bit_rsh1(D);
+        dec_bit_rsh1(d);
+        b++;
+    }
+    /*
+    while(dec_comp(d1, k0) != NEUNET_DEC_CMP_EQL && dec_comp(D1, k0) != NEUNET_DEC_CMP_EQL){
+        if(!(!(D1.it[0] % 2) && !(d1.it[0] % 2))){ k = dec_add(sgn, k, sgn, kp, sgn); }
+        dec_bit_lsh_one(kp);
+        dec_bit_rsh_one(D1);
+        dec_bit_rsh_one(d1);
+    }
+    */
+    return k;
+}
+
+/**
+ * @brief Binary not
+ * @param fst   [In]    first source
+ * @param snd   [In]    second source
+ * @param sgn1  [In]    first source sign
+ * @param sgn2  [In]    second source sign
+ * @param bit   [In]    lower bit count, minimum is the bit count of sources value
+ */
+net_decimal_data dec_bit_xor(const net_decimal_data &fst, const net_decimal_data &snd, bool sgn1 = false, bool sgn2 = false, uint64_t bit = 0) {
+    auto k0 = dec_bit_k0(),
+         k1 = dec_bit_k1(),
+         k  = k0,
+         D  = fst,
+         d  = snd;
+    auto b  = 0;
+    auto k_sgn = false;
+    if (!bit) {
+        auto a = dec_bit_cnt(D),
+             b = dec_bit_cnt(d);
+        bit = a > b ? a : b;
+    }
+    if (sgn1) dec_bit_not(D, true, bit, true);
+    if (sgn2) dec_bit_not(d, true, bit, true);
+    while(dec_comp(d, k0) != NEUNET_DEC_CMP_EQL || dec_comp(D, k0) != NEUNET_DEC_CMP_EQL || b < bit){
+        if (!(!D.it.length || !d.it.length)) { if((D.it[0] % 2 && !(d.it[0] % 2)) || (!(D.it[0] % 2) && d.it[0] % 2)) k = dec_add(k_sgn, k, true, k1, true); }
+        else if (!D.it.length) { if (d.it[0] % 2) k = dec_add(k_sgn, k, false, k1, false); }
+        else if (!d.it.length) { if (D.it[0] % 2) k = dec_add(k_sgn, k, false, k1, false); }
+        dec_bit_lsh1(k1);
+        dec_bit_rsh1(D);
+        dec_bit_rsh1(d);
+        b++;
+    }
+    /*
+    while(dec_comp(d1, k0) != NEUNET_DEC_CMP_EQL && dec_comp(D1, k0) != NEUNET_DEC_CMP_EQL){
+        if((D1.it[0] % 2 && !(d1.it[0] % 2)) || (!(D1.it[0] % 2) && d1.it[0] % 2)){ k = dec_add(sgn, k, sgn, kp, sgn); }
+        dec_bit_lsh_one(kp);
+        dec_bit_rsh_one(D1);
+        dec_bit_rsh_one(d1);
+    }
+    */
+    return k;
+}
+
 // NOT thread safety
 class {
 private:
@@ -125,7 +427,7 @@ public:
             }
             s = dec_mul(s, o);
             b = dec_add(b, c);
-            d = dec_e10_mul(s, precision + 2);
+            d = dec_e10(s, precision + 2);
         } while (dec_comp(d, b) == NEUNET_DEC_CMP_GTR);
         a = dec_mul(c, dec_div(p, q, prec));
         return a;
@@ -199,21 +501,6 @@ public:
         return dec_div(p, q, precision);
     }
 
-    const net_decimal_data &num(uint64_t precision) {
-        run(precision);
-        return p;
-    }
-
-    net_decimal_data num_2pi(uint64_t precision) {
-        run(precision);
-        return dec_mul(dec_2, p);
-    }
-
-    const net_decimal_data &den(uint64_t precision) {
-        run(precision);
-        return q;        
-    }
-
 } net_decimal_pi;
 
 // 0 < src <= 2
@@ -244,7 +531,7 @@ net_decimal_data dec_ln_2(bool &ans_sgn, const net_decimal_data &src, uint64_t p
         x = dec_mul(x_sgn, x, x_sgn, o, o_sgn);
         b = dec_add(b, i);
         c_sgn = !c_sgn;
-        d = dec_e10_mul(x, prec + 2);
+        d = dec_e10(x, prec + 2);
     } while (dec_comp(d, b) == NEUNET_DEC_CMP_GTR);
     return dec_div(ans_sgn, p, p_sgn, q, false, prec);
 }
@@ -267,7 +554,6 @@ net_decimal_data dec_ln(bool &ans_sgn, const net_decimal_data &src, uint64_t pre
     return dec_add(ans_sgn, base, ans_sgn, cnt, cnt_sgn);
 }
 
-// TODO waiting for optimizing ... 
 net_decimal_data dec_exp(bool &ans_sgn, const net_decimal_data &src_num, const net_decimal_data &src_den,  bool src_sgn, uint64_t prec) {
     auto c = dec_init(ans_sgn, 1),
          p = c,
@@ -294,7 +580,7 @@ net_decimal_data dec_exp(bool &ans_sgn, const net_decimal_data &src_num, const n
         u = dec_mul(u_sgn, u, u_sgn, src_num, src_sgn);
         if (s_dec) v = dec_mul(v, c);
         else v = dec_mul(v, dec_mul(c, src_den));
-        d = dec_e10_mul(u, prec + 2);
+        d = dec_e10(u, prec + 2);
     } while (dec_comp(d, v) == NEUNET_DEC_CMP_GTR);
     return dec_div(ans_sgn, p, p_sgn, q, false, prec);
 }
@@ -330,9 +616,11 @@ net_decimal_data dec_sin_cos(bool &ans_sgn, const net_decimal_data &src_num, con
             v = dec_mul(v, b);
         }
         c_sgn = !c_sgn;
-        d = dec_e10_mul(u, prec + 2);
+        d = dec_e10(u, prec + 2);
     } while (dec_comp(d, v) == NEUNET_DEC_CMP_GTR);
     return dec_div(ans_sgn, p, p_sgn, q, false, prec);
 }
+
+
 
 NEUNET_END

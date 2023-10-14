@@ -96,7 +96,8 @@
         "coroutine": "cpp",
         "resumable": "cpp",
         "future": "cpp",
-        "shared_mutex": "cpp"
+        "shared_mutex": "cpp",
+        "fstream": "cpp"
     },
     "[plaintext]": {
         "editor.wrappingIndent": "none",
