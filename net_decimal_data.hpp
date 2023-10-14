@@ -210,6 +210,28 @@ std::string dec_to_string(bool sgn, const net_decimal_data &src) {
     return ans;
 }
 
+std::string dec_to_string_seg(uint64_t src) {
+    std::string ans {"["};
+    auto pow_exp = NEUNET_DEC_SEG_MAX / 10;
+    while (pow_exp > src) {
+        ans.push_back(' ');
+        pow_exp /= 10;
+    }
+    if (src) ans += std::to_string(src);
+    else ans[ans.length() - 1] = '0';
+    return ans + ']';
+}
+std::string dec_to_string_coe(long long src) {
+    std::string ans = "[";
+    auto space = 4;
+    if (src >= 0) --space;
+    if (std::abs(src) < 100) --space;
+    if (std::abs(src) < 10) --space;
+    for (auto i = space; i < 4; ++i) ans.push_back(' ');
+    ans += std::to_string(src);
+    return ans + ']';
+}
+
 int64_t dec_to_integer(bool sgn, const net_decimal_data &src) {
     net_assert(src.it.length == 1, "neunet", "dec_to_integer(net_decimal_data)", "Value is out of limit.");
     if (dec_is_zero(src)) return 0;
@@ -333,6 +355,8 @@ void dec_mul_carry(uint64_t &carry, bool &ca_add) { if (ca_add) {
 } }
 
 uint64_t dec_mul(uint64_t &carry, uint64_t fst, uint64_t snd) {
+    carry = 0;
+    if (!(snd && fst)) return 0;
     if (snd < NEUNET_DEC_SEG_MAX / fst) return fst * snd;
     /*
     9999999|999999|999999 ^ 2 =
@@ -348,7 +372,6 @@ uint64_t dec_mul(uint64_t &carry, uint64_t fst, uint64_t snd) {
              ans_coe[5] = {0};
     dec_mul_coe(fst_coe);
     dec_mul_coe(snd_coe);
-    carry = 0;
     for (auto i = 0; i < 3; ++i) for (auto j = 0; j < 3; ++j) ans_coe[i + j] += fst_coe[i] * snd_coe[j];
     auto ca_add = false;
     auto ans_1  = ans_coe[1] * NEUNET_DEC_MUL_POW,
@@ -504,12 +527,13 @@ uint8_t dec_div(net_set<uint8_t> &divd, const net_set<uint8_t> &divr) {
         }
     } else divd_tmp.init(divr.length);
     auto ans_coe = divd[0] / divr[0];
-    if (ans_coe >= 10) ans_coe = 9;
+    if (ans_coe >= 10) 
+    ans_coe = 9;
     while (true) {
         auto carry = 0ll;
         
-        // for (auto i = 0ull; i < divd.length; ++i) std::cout << dec_to_string(divd[i]); std::cout << '\n';
-        // for (auto i = 0ull; i < divr.length; ++i) std::cout << dec_to_string(ans_coe * divr[i]); std::cout << '\n';
+        // for (auto i = 0ull; i < divd.length; ++i) std::cout << dec_to_string_coe(divd[i]); std::cout << '\n';
+        // for (auto i = 0ull; i < divr.length; ++i) std::cout << dec_to_string_coe(ans_coe * divr[i]); std::cout << '\n';
         
         if (divd.length > divr.length) divd_tmp.copy(divr.length - 1, divd, divr.length, divd.length - divr.length);
         for (auto i = divr.length; i > 1; --i) {
@@ -519,8 +543,8 @@ uint8_t dec_div(net_set<uint8_t> &divd, const net_set<uint8_t> &divr) {
         }
         carry += divd[0] - ans_coe * divr[0];
 
-        // std::cout << dec_to_string(carry);
-        // for (auto i = 0ull; i < divd_tmp.length; ++i) std::cout << dec_to_string(divd_tmp[i]); std::cout << '\n';
+        // std::cout << dec_to_string_coe(carry);
+        // for (auto i = 0ull; i < divd_tmp.length; ++i) std::cout << dec_to_string_coe(divd_tmp[i]); std::cout << '\n';
 
         if (carry >= 0) {
             divd_tmp[0] += carry * 10;
@@ -532,7 +556,9 @@ uint8_t dec_div(net_set<uint8_t> &divd, const net_set<uint8_t> &divr) {
         --ans_coe;
     }
     divd = std::move(divd_tmp);
+    
     // std::cout << int(ans_coe) << '\n' << std::endl;
+    
     return ans_coe;
 }
 net_decimal_data dec_div(const net_decimal_data &divd, const net_decimal_data &divr, uint64_t prec) {
@@ -797,38 +823,6 @@ net_decimal_data dec_div(bool &ans_sgn, const net_decimal_data &divd, bool divd_
     if (dec_is_zero(divd)) return {};
     if (dec_is_zero(divr)) return divd;
     return dec_div(divd, divr, prec);
-}
-
-void dec_bit_lsh_one(net_decimal_data &D, bool sta = false){
-    if (dec_dig_cnt(D, false) || !dec_dig_cnt(D, true) || (!(dec_dig_cnt(D, true) - 1) && D.it[0] == 0)) return;
-    if (!sta && D.it[D.it.length - 1] >= NEUNET_DEC_BIT_BAS) D.it.init(D.it.length + 1);
-    int t = 0;
-    for(uint64_t m = 0; m < D.it.length; m++) if(D.it[m] >= NEUNET_DEC_BIT_BAS) {
-        D.it[m] -= NEUNET_DEC_BIT_BAS;
-        D.it[m] <<= 1;
-        D.it[m] += t;
-        t = 1;
-    } else {
-        D.it[m] <<= 1;
-        D.it[m] += t;
-        t = 0;
-    }
-}
-
-void dec_bit_rsh_one(net_decimal_data &D, bool sta = false){
-    uint64_t k1 = NEUNET_DEC_BIT_BAS;
-    if (dec_dig_cnt(D, false) || !dec_dig_cnt(D, true) || (!(dec_dig_cnt(D, true) - 1) && D.it[0] == 0)) return;
-    uint64_t t = 0;
-    for(uint64_t m = D.it.length; m > 0; m--) if(D.it[m - 1] % 2 == 1){ 
-        D.it[m - 1] >>= 1;
-        D.it[m - 1] += t;
-        t = k1;
-    } else{
-        D.it[m - 1] >>= 1;
-        D.it[m - 1] += t;
-        t = 0;
-    }
-    if (!sta && !D.it[D.it.length - 1]) D.it.length - 1 ? D.it[D.it.length - 2] < NEUNET_DEC_BIT_TOP ? D.it.init(D.it.length - 1, true) : D.it.init(D.it.length, true) : D.it.init(D.it.length - 1, true);
 }
 
 NEUNET_END

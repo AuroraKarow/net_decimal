@@ -620,7 +620,8 @@ public:
         neunet_type_else
         net_assert(src.is_integer() && bit.is_integer(), "net_decimal", "<<", "Variables should be ineteger.");
         net_decimal ans = src;
-        for (net_decimal i = 0; i < bit; ++i) dec_bit_lsh_one(ans.base);
+        // TODO lsh operation
+        // for (net_decimal i = 0; i < bit; ++i) dec_bit_lsh_one(ans.base);
         return ans;
         neunet_type_endif
     }
@@ -637,7 +638,8 @@ public:
         neunet_type_else
         net_assert(src.is_integer() && bit.is_integer(), "net_decimal", ">>", "Variables should be ineteger.");
         net_decimal ans = src;
-        for (net_decimal i = 0; i < bit; ++i) dec_bit_rsh_one(ans.base);
+        // TODO rsh operation
+        // for (net_decimal i = 0; i < bit; ++i) dec_bit_rsh_one(ans.base);
         return ans;
         neunet_type_endif
     }
