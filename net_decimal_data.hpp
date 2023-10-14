@@ -624,6 +624,117 @@ bool dec_gcd(net_decimal_data &fst, net_decimal_data &snd) {
     return dec_gcd(fst, snd);
 }
 
+net_decimal_data dec_e10_mul(const net_decimal_data &src, uint64_t dig_cnt) {
+    auto exe_tmp = dig_cnt;
+    auto seg_cnt = dig_cnt / NEUNET_DEC_DIG_MAX,
+         seg_rem = 0ull;
+    net_decimal_data ans;
+    if (seg_cnt) {
+        if (seg_cnt >= src.ft.length) if (seg_cnt == src.ft.length) ans.it = std::move(src.ft);
+        else {
+            ans.it.init(seg_cnt);
+            ans.it.copy(0, src.ft, 0, src.ft.length);
+        } else {
+            ans.ft = src.ft.sub_set(seg_cnt, src.ft.length - 1);
+            ans.it = src.ft.sub_set(0, seg_cnt - 1);
+        }
+        ans.it.reverse();
+        ans.it = ans.it.unit(src.it);
+    }
+    dig_cnt %= NEUNET_DEC_DIG_MAX;
+    if (!dig_cnt) return ans;
+    seg_cnt = 1;
+    for (auto i = 0; i < dig_cnt; ++i) seg_cnt *= 10;
+    dig_cnt = NEUNET_DEC_SEG_MAX / seg_cnt;
+    for (auto i = ans.ft.length; i; --i) {
+        auto seg_idx     = i - 1;
+        auto seg_tmp     = ans.ft[seg_idx] / dig_cnt;
+        ans.ft[seg_idx] %= dig_cnt;
+        ans.ft[seg_idx] *= seg_cnt;
+        ans.ft[seg_idx] += seg_rem;
+        seg_rem          = seg_tmp;
+    }
+    if (ans.ft.length) {
+        auto tmp = ans.ft.length;
+        while (tmp && !ans.ft[tmp - 1]) --tmp;
+        if (tmp && tmp < ans.ft.length) ans.ft = ans.ft.sub_set(0, tmp - 1);
+        if (!tmp) ans.ft.reset();
+    }
+    for (auto i = 0ull; i < ans.it.length; ++i) {
+        auto seg_tmp = ans.it[i] / dig_cnt;
+        ans.it[i]   %= dig_cnt;
+        ans.it[i]   *= seg_cnt;
+        ans.it[i]   += seg_rem;
+        seg_rem      = seg_tmp;
+    }
+    if (seg_rem) {
+        net_set<uint64_t> it(ans.it.length + 1);
+        it.copy(0, ans.it, 0, ans.it.length);
+        it[ans.it.length] = seg_rem;
+        ans.it = std::move(it);
+    } else {
+        auto tmp = ans.it.length;
+        while (tmp && !ans.it[tmp - 1]) --tmp;
+        if (tmp && tmp < ans.it.length) ans.it = ans.it.sub_set(0, tmp - 1);
+        if (!tmp) ans.it.reset();
+    }
+    return ans;
+}
+
+net_decimal_data dec_e10_div(const net_decimal_data &src, uint64_t dig_cnt, bool div = false) {
+    auto seg_cnt = dig_cnt / NEUNET_DEC_DIG_MAX,
+         seg_rem = 0ull;
+    net_decimal_data ans;       
+    if (seg_cnt) {
+        if (seg_cnt >= src.it.length) if (seg_cnt == src.it.length) ans.ft = std::move(src.it);
+        else {
+            ans.ft.init(seg_cnt);
+            ans.ft.copy(0, src.it, 0, src.it.length);
+        } else {
+            ans.it = src.it.sub_set(seg_cnt, src.it.length - 1);
+            ans.ft = src.it.sub_set(0, seg_cnt - 1);
+        }
+        ans.ft.reverse();
+        ans.ft = ans.ft.unit(src.ft);
+    }
+    dig_cnt %= NEUNET_DEC_DIG_MAX;
+    if (!dig_cnt) return ans;
+    seg_cnt = 1;
+    for (auto i = 0; i < dig_cnt; ++i) seg_cnt *= 10;
+    dig_cnt = NEUNET_DEC_SEG_MAX / seg_cnt;
+    for (auto i = ans.it.length; i; --i) {
+        auto seg_idx     = i - 1;
+        auto seg_tmp     = ans.it[seg_idx] % seg_cnt;
+        ans.it[seg_idx] /= seg_cnt;
+        ans.it[seg_idx] += seg_rem * dig_cnt;
+        seg_rem          = seg_tmp;
+    }
+    if (ans.it.length) {
+        auto tmp = ans.it.length;
+        while (tmp && !ans.it[tmp - 1]) --tmp;
+        if (tmp && tmp < ans.it.length) ans.it = ans.it.sub_set(0, tmp - 1);
+        if (!tmp) ans.it.reset();
+    }
+    for (auto i = 0ull; i < ans.ft.length; ++i) {
+        auto seg_tmp = ans.ft[i] % seg_cnt;
+        ans.ft[i]   /= seg_cnt;
+        ans.ft[i]   += seg_rem * dig_cnt;
+        seg_rem      = seg_tmp;
+    }
+    if (seg_rem) {
+        net_set<uint64_t> ft(ans.ft.length + 1);
+        ft.copy(0, ans.ft, 0, ans.ft.length);
+        ft[ans.ft.length] = seg_rem;
+        ans.ft = std::move(ft);
+    } else {
+        auto tmp = ans.ft.length;
+        while (tmp && !ans.ft[tmp - 1]) --tmp;
+        if (tmp && tmp < ans.ft.length) ans.ft = ans.ft.sub_set(0, tmp - 1);
+        if (!tmp) ans.ft.reset();
+    }
+    return ans;
+}
+
 net_decimal_data dec_e10(net_decimal_data &e10, const net_decimal_data &src) {
     auto sgn = false;
     if (!src.ft.length) {
@@ -678,7 +789,6 @@ net_decimal_data dec_e10(net_decimal_data &e10, const net_decimal_data &src) {
     ans.it = it_seg.sub_set(0, end_idx);
     return ans;
 }
-
 net_decimal_data dec_e10(uint64_t e10) {
     net_decimal_data ans;
     if (!e10) {

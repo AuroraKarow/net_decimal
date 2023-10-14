@@ -49,7 +49,7 @@ public:
             o = dec_init(sgn, "0.36");
             q = b;
         }
-        net_decimal_data e10 = net_decimal_prec.get(precision + 2), d;
+        net_decimal_data d;
         do {
             if (dec_comp(b, q) == NEUNET_DEC_CMP_EQL) p = dec_add(p, s);
             else {
@@ -58,7 +58,7 @@ public:
             }
             s = dec_mul(s, o);
             b = dec_add(b, c);
-            d = dec_mul(s, e10);
+            d = dec_e10_mul(s, precision + 2);
         } while (dec_comp(d, b) == NEUNET_DEC_CMP_GTR);
         a = dec_mul(c, dec_div(p, q, prec));
         return a;
@@ -206,7 +206,7 @@ protected:
                     o {x},
                     c {b},
                     a {p};
-        net_decimal_data e10 = net_decimal_prec.get(division_precision + 2), d;
+        net_decimal_data d;
         do {
             if (b == q) p += x;
             else {
@@ -215,7 +215,7 @@ protected:
             }
             x *= o;
             ++b;
-            d = dec_mul(e10, x.base);
+            d = dec_e10_mul(x.base, division_precision + 2);
             c.sgn  = !c.sgn;
         } while (dec_comp(d, b.base) == NEUNET_DEC_CMP_GTR);
         a.base = dec_div(a.sgn, p.base, p.sgn, q.base, q.sgn, prec);
@@ -235,9 +235,8 @@ protected:
             g.base = o.frac.num;
             h.base = o.frac.den;
         }
-        net_decimal_data e10 = net_decimal_prec.get(division_precision + 2), d;
+        net_decimal_data d;
         do {
-            // m = std::move(n);
             if (q == v) p += c * u;
             else {
                 p  = v * p + c * q * u;
@@ -248,10 +247,9 @@ protected:
                 u *= g;
                 v *= h;
             }
-            // n.base = dec_div(n.sgn, p.base, p.sgn, q.base, q.sgn, division_precision);
             for (auto i = 0; i < 2; ++i) v *= (++b);
             c.sgn = !c.sgn;
-            d = dec_mul(e10, u.base);
+            d = dec_e10_mul(u.base, division_precision + 2);
         } while (dec_comp(d, v.base) == NEUNET_DEC_CMP_GTR);
         n.base = dec_div(n.sgn, p.base, p.sgn, q.base, q.sgn, division_precision);
         return n;
@@ -352,7 +350,7 @@ public:
                     a {v};
         frac_init(u, v);
         frac_init(m, n);
-        net_decimal_data e10 = net_decimal_prec.get(division_precision + 2), d;
+        net_decimal_data d;
         do {
             if (q == v) p += u;
             else {
@@ -367,7 +365,7 @@ public:
                 u *= m;
                 v *= c * n;
             }
-            d = dec_mul(e10, u.base);
+            d = dec_e10_mul(u.base, division_precision + 2);
         } while (dec_comp(d, v.base) == NEUNET_DEC_CMP_GTR);
         a.base = dec_div(a.sgn, p.base, p.sgn, q.base, q.sgn, division_precision);
         return a;
@@ -440,6 +438,12 @@ public:
         return *this;
     }
 
+    callback_dec_s friend bool operator==(fst_dec_t &&fst, snd_dec_t &&snd) {
+        neunet_type_if (neunet_dec_num(fst_dec_t)) return net_decimal {fst} == snd;
+        neunet_type_elif (neunet_dec_num(snd_dec_t)) return fst == net_decimal {snd};
+        neunet_type_else return fst.comp(snd) == NEUNET_DEC_CMP_EQL;
+        neunet_type_endif
+    }
     callback_dec_s friend auto operator<=>(fst_dec_t &&fst, snd_dec_t &&snd) {
         neunet_type_if (neunet_dec_num(fst_dec_t)) return net_decimal {fst} <=> snd;
         neunet_type_elif (neunet_dec_num(snd_dec_t)) return fst <=> net_decimal {snd};
@@ -449,12 +453,6 @@ public:
         if (cmp_res == NEUNET_DEC_CMP_LES) return fst.sgn ? std::strong_ordering::greater : std::strong_ordering::less;
         if (cmp_res == NEUNET_DEC_CMP_GTR) return fst.sgn ? std::strong_ordering::less : std::strong_ordering::greater;
         return std::strong_ordering::equal;
-        neunet_type_endif
-    }
-    callback_dec_s friend bool operator==(fst_dec_t &&fst, snd_dec_t &&snd) {
-        neunet_type_if (neunet_dec_num(fst_dec_t)) return net_decimal {fst} == snd;
-        neunet_type_elif (neunet_dec_num(snd_dec_t)) return fst == net_decimal {snd};
-        neunet_type_else return fst.comp(snd) == NEUNET_DEC_CMP_EQL;
         neunet_type_endif
     }
 

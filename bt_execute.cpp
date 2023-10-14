@@ -25,6 +25,7 @@ void dec_bit_lt_one(net_decimal_data &D, bool sta = false){
 
 void dec_bit_rt_one(net_decimal_data &D, bool sta = false){
     if (D.ft.length || !D.it.length) return;
+    if (!(D.it.length - 1)) D.it[0] >>= 1; return;
     uint64_t t = 0;
     for(uint64_t m = D.it.length; m > 0; m--) if(D.it[m - 1] % 2 == 1){ 
         D.it[m - 1] >>= 1;
@@ -241,44 +242,23 @@ net_decimal_data dec_exec_bit(const int type, const net_decimal_data &D, const n
 }
 
 
-// bool dec_bit_lt_one0(net_decimal_data &D, bool sgn = true){
-//     if (dec_dig_cnt(D, false)) return sgn;
-//     //if () D.it[D.it.length - 1] += k;
-//     return sgn;
-// }
+net_decimal_data dec_bit_lt_one0(net_decimal_data &D, bool sgn = true){
+    if (D.ft.length || !D.it.length) return D;
+    auto d = D;
+    dec_bit_not(d, true);
+    dec_bit_lt_one(d);
+    //if () D.it[D.it.length - 1] += k;
+    return dec_bit_val(d);
+}
 
-// bool dec_bit_rt_one0(net_decimal_data &D, bool sgn = true){
-//     uint64_t k0 = 0, k1 = NEUNET_DEC_BIT_BAS;
-//     if (dec_dig_cnt(D, false)) return sgn;
-//     if(D.it[D.it.length - 1] >= NEUNET_DEC_BIT_TOP){
-//         D.it[D.it.length - 1] -= NEUNET_DEC_BIT_TOP;
-//         uint64_t t = 0;
-//         for(uint64_t m = D.it.length; m > 0; m--) if(D.it[m - 1] % 2 == 1){ 
-//             D.it[m - 1] >>= 1;
-//             D.it[m - 1] += t;
-//             t = k1;
-//         } else{
-//             D.it[m - 1] >>= 1;
-//             D.it[m - 1] += t;
-//             t = 0;
-//         }
-//         if(D.it[D.it.length - 1] > 0) D.it.init(D.it.length + 1);
-//         D.it[D.it.length - 1] += NEUNET_DEC_BIT_TOP;
-//         return sgn;
-//     }
-//     uint64_t t = 0;
-//     for(uint64_t m = D.it.length; m > 0; m--) if(D.it[m - 1] % 2 == 1){ 
-//         D.it[m - 1] >>= 1;
-//         D.it[m - 1] += t;
-//         t = k1;
-//     } else {
-//         D.it[m - 1] >>= 1;
-//         D.it[m - 1] += t;
-//         t = 0;
-//     }
-//     if(!D.it[D.it.length - 1]) D.it.init(D.it.length - 1, true);
-//     // std::cout << "dec_rt" << std::endl;
-// }
+net_decimal_data dec_bit_rt_one0(net_decimal_data &D, bool sgn = true){
+    if (D.ft.length || !D.it.length) return D;
+    auto d = D;
+    dec_bit_not(d, true);
+    dec_bit_rt_one(d);
+    //if () D.it[D.it.length - 1] += k;
+    return dec_bit_val(d);
+}
 
 uint64_t rev0(uint64_t &d){
     uint64_t dn = 0;
@@ -366,26 +346,48 @@ void main(){
 	std::cout << "1: " << dec_to_string(k_sgn, K1) << std::endl;
 
     auto start = NEUNET_CHRONO_TIME_POINT;
-	for(int a = 0;a < 1000000000;a++){
-        dec_lt_move(k2, 2);
-        dec_rt_move(k2, 2); 
-    }
+	// for(uint64_t l = 0; l < 1000000000000000000; l++){
+	//     for(uint64_t k = 0; k < 1000000000000000000; k++){
+	//         for(uint64_t j = 0; j < 1000000000000000000; j++){
+	//             for(uint64_t i = 0; i < 1000000000000000000; i++){
+	//                 for(uint64_t h = 0; h < 1000000000000000000; h++){
+	//                     for(uint64_t g = 0; g < 1000000000000000000; g++){
+	//                         for(uint64_t f = 0; f < 1000000000000000000; f++){
+	//                             for(uint64_t e = 0; e < 1000000000000000000; e++){
+	//                                 for(uint64_t d = 0; d < 1000000000000000000; d++){
+	//                                     for(uint64_t c = 0; c < 1000000000000000000; c++){
+	//                                         for(uint64_t b = 0; b < 1000000000000000000; b++){
+	//                                             for(uint64_t a = 0; a < 1000000000000000000; a++){
+    //                                                 k03 <<= 4;
+    //                                                 k03 >>= 4;
+    //                                             }
+    //                                         }
+    //                                     }
+    //                                 }
+    //                             }
+    //                         }
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 	auto end = NEUNET_CHRONO_TIME_POINT;
+	std::cout << "Time1: " << end - start << std::endl;
+    start = NEUNET_CHRONO_TIME_POINT;
+	for(uint64_t a = 0; a < 100000000; a++){
+        dec_lt_move(k2, 2);
+        dec_rt_move(k2, 2);
+    }
+	end = NEUNET_CHRONO_TIME_POINT;
 	std::cout << "Time: " << end - start << std::endl;
     start = NEUNET_CHRONO_TIME_POINT;
-	for(int a = 0;a < 1000000000;a++){
+	for(uint64_t a = 0; a < 100000000; a++){
         dec_lt_move(k1, 2);
-        dec_rt_move(k1, 2); 
+        dec_rt_move(k1, 2);
     }
 	end = NEUNET_CHRONO_TIME_POINT;
 	std::cout << "Time0: " << end - start << std::endl;
-    start = NEUNET_CHRONO_TIME_POINT;
-	for(int a = 0;a < 1000000000;a++){
-        k03 << 4;
-        k03 >> 4; 
-    }
-	end = NEUNET_CHRONO_TIME_POINT;
-	std::cout << "Time1: " << end - start << std::endl;
 	// std::cout << k1.it << std::endl;
 	//std::cout << "Tell: " << dec_to_string(k_sgn, k1 / k0) << std::endl;
     dec_bit_not(K);
