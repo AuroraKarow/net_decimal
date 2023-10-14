@@ -1,5 +1,72 @@
 NEUNET_BEGIN
 
+// NOT thread safety
+class {
+private:
+    net_set<net_decimal_data> prec;
+    
+public:
+    net_decimal_data get(uint64_t precision) {
+        if (!precision) return dec_e10(0);
+        --precision;
+        if (precision >= prec.length) {
+            auto len = prec.length;
+            if (!len) len = 128;
+            while (len < precision) len <<= 1;
+            prec.init(len);
+        }
+        if (dec_is_zero(prec[precision])) prec[precision] = dec_e10(precision + 1);
+        return prec[precision];
+    }
+
+} net_decimal_prec;
+
+// NOT thread safety
+class {
+private:
+    net_decimal_data b,
+                     c,
+                     s,
+                     o,
+                     p,
+                     q,
+                     a;
+
+    bool need_init = true;
+
+    uint64_t prec = 0;
+
+public:
+    net_decimal_data get(uint64_t precision) {
+        if (precision <= prec) return a;
+        prec = precision;
+        if (need_init) {
+            need_init = false;
+            auto sgn  = false;
+            b = dec_init(sgn, 1);
+            c = dec_init(sgn, 2);
+            s = dec_init(sgn, "0.6");
+            o = dec_init(sgn, "0.36");
+            q = b;
+        }
+        net_decimal_data e10 = net_decimal_prec.get(precision + 2), d;
+        do {
+            if (dec_comp(b, q) == NEUNET_DEC_CMP_EQL) p = dec_add(p, s);
+            else {
+                p = dec_add(dec_mul(b, p), dec_mul(s, q));
+                q = dec_mul(q, b);
+            }
+            s = dec_mul(s, o);
+            b = dec_add(b, c);
+            d = dec_mul(s, e10);
+        } while (dec_comp(d, b) == NEUNET_DEC_CMP_GTR);
+        a = dec_mul(c, dec_div(p, q, prec));
+        return a;
+    }
+
+} net_decimal_ln4;
+
+// NOT thread safety
 class {
 private:
     bool on  = false,
@@ -130,42 +197,17 @@ protected:
         }
     }
 
-    static net_decimal ln_4(uint64_t prec, bool show_iter = false) {
-        net_decimal b {1},
-                    c {2},
-                    s {"0.6"},
-                    o {"0.36"},
-                    p {0},
-                    q {b},
-                    m {p},
-                    n {p};
-        do {
-            if (show_iter) std::cout << n << std::endl;
-            m = std::move(n);
-            if (b == q) p += s;
-            else {
-                p  = b * p + s * q;
-                q *= b;
-            }
-            s *= o;
-            b += c;
-            n.base = dec_div(n.sgn, p.base, p.sgn, q.base, q.sgn, prec);
-        } while (m != n);
-        return 2 * n;
-    }
     // ln(x + 1) = (-1 < x <= 1)
-    net_decimal ln_2(uint64_t prec, bool show_iter = false) {
+    net_decimal ln_2(uint64_t prec) {
         net_decimal b {1},
                     p {0},
                     q {b},
                     x {*this - 1},
                     o {x},
                     c {b},
-                    m {p},
-                    n {p};
+                    a {p};
+        net_decimal_data e10 = net_decimal_prec.get(division_precision + 2), d;
         do {
-            if (show_iter) std::cout << n << std::endl;
-            m = std::move(n);
             if (b == q) p += x;
             else {
                 p  = b * p + c * x * q;
@@ -173,37 +215,11 @@ protected:
             }
             x *= o;
             ++b;
-            n.base = dec_div(n.sgn, p.base, p.sgn, q.base, q.sgn, prec);
+            d = dec_mul(e10, x.base);
             c.sgn  = !c.sgn;
-        } while (m != n);
-        return n;
-    }
-    net_decimal ln_proto(uint64_t prec, bool show_iter = false) {
-        net_decimal b {1},
-                    p {0},
-                    q {b},
-                    o {p},
-                    u {*this - 1},
-                    v {*this + 1},
-                    h {u * u},
-                    s {v * v},
-                    m {p},
-                    n {p};
-        do {
-            if (show_iter) std::cout << n << std::endl;
-            m = std::move(n);
-            if (q == v) p += u;
-            else {
-                o  = b * v;
-                p  = o * p + u * q;
-                q *= o;
-            }
-            u *= h;
-            v *= s;
-            b += 2;
-            n.base = dec_div(n.sgn, p.base, p.sgn, q.base, q.sgn, prec);
-        } while (m != n);
-        return 2 * n;
+        } while (dec_comp(d, b.base) == NEUNET_DEC_CMP_GTR);
+        a.base = dec_div(a.sgn, p.base, p.sgn, q.base, q.sgn, prec);
+        return a;
     }
 
     net_decimal sin_cos_proto(net_decimal &u, net_decimal &v, net_decimal &b) {
@@ -219,8 +235,9 @@ protected:
             g.base = o.frac.num;
             h.base = o.frac.den;
         }
+        net_decimal_data e10 = net_decimal_prec.get(division_precision + 2), d;
         do {
-            m = std::move(n);
+            // m = std::move(n);
             if (q == v) p += c * u;
             else {
                 p  = v * p + c * q * u;
@@ -231,10 +248,12 @@ protected:
                 u *= g;
                 v *= h;
             }
-            n.base = dec_div(n.sgn, p.base, p.sgn, q.base, q.sgn, division_precision);
+            // n.base = dec_div(n.sgn, p.base, p.sgn, q.base, q.sgn, division_precision);
             for (auto i = 0; i < 2; ++i) v *= (++b);
             c.sgn = !c.sgn;
-        } while (m != n);
+            d = dec_mul(e10, u.base);
+        } while (dec_comp(d, v.base) == NEUNET_DEC_CMP_GTR);
+        n.base = dec_div(n.sgn, p.base, p.sgn, q.base, q.sgn, division_precision);
         return n;
     }
 
@@ -313,11 +332,13 @@ public:
         }
         net_decimal cnt  {0},
                     base {*this};
+        if (base < 1) return base.ln_2(division_precision);
         while (base > 1) {
             base *= 0.25;
             ++cnt;
         }
-        return base.ln_2(division_precision) + cnt * ln_4(division_precision);
+        cnt.base = dec_mul(cnt.sgn, cnt.base, false, net_decimal_ln4.get(division_precision), false);
+        return base.ln_2(division_precision) + cnt;
     }
 
     net_decimal exp() {
@@ -326,14 +347,13 @@ public:
                     q {c},
                     v {0},
                     u {v},
-                    a {v},
-                    b {v},
-                    m {p},
-                    n {p};
+                    m {v},
+                    n {v},
+                    a {v};
         frac_init(u, v);
-        frac_init(a, b);
+        frac_init(m, n);
+        net_decimal_data e10 = net_decimal_prec.get(division_precision + 2), d;
         do {
-            m = std::move(n);
             if (q == v) p += u;
             else {
                 p  = v * p + u * q;
@@ -344,12 +364,13 @@ public:
                 u *= *this;
                 v *= c;
             } else {
-                u *= a;
-                v *= c * b;
+                u *= m;
+                v *= c * n;
             }
-            n.base = dec_div(n.sgn, p.base, p.sgn, q.base, q.sgn, division_precision);
-        } while (m != n);
-        return n;
+            d = dec_mul(e10, u.base);
+        } while (dec_comp(d, v.base) == NEUNET_DEC_CMP_GTR);
+        a.base = dec_div(a.sgn, p.base, p.sgn, q.base, q.sgn, division_precision);
+        return a;
     }
 
     net_decimal sin() {
@@ -388,12 +409,9 @@ public:
         do {
             prd = cnt * pia;
             ans = prd.sin();
-            // dec_truncate(ans.base, division_precision - 1);
-            // std::cout << ans << '\n' << std::endl;
             if (ans.is_zero()) {
                 prd = prd.cos();
                 dec_truncate(prd.base, division_precision);
-                // std::cout << prd << std::endl;
                 if (sgn) return abs().pow(times) * prd;
                 return pow(times) * prd;
             }
@@ -495,7 +513,6 @@ public:
         if (!dec_is_valid(subt.frac)) subt.frac = dec_init(subt.base, subt.fraction_reduct);
         ans.dec  = false;
         ans.frac = dec_sub(ans.sgn, minu.frac, minu.sgn, subt.frac, subt.sgn, false);
-        return ans;
         return ans;
         neunet_type_endif
     }
@@ -670,16 +687,16 @@ NEUNET_END
 
 _STD_BEGIN
 
-neunet::net_decimal abs(const neunet::net_decimal &_Xx) { return _Xx.abs(); }
+// neunet::net_decimal abs(const neunet::net_decimal &_Xx) { return _Xx.abs(); }
 
-neunet::net_decimal pow(neunet::net_decimal &_Xx, neunet::net_decimal &_Yx) { return _Xx.pow(_Yx); }
+// callback_dec_ins_s neunet::net_decimal pow(ins_fst &&_Xx, ins_snd &&_Yx) { return _Xx.pow(_Yx); }
 
-neunet::net_decimal exp(neunet::net_decimal &_Xx) { return _Xx.exp(); }
+// callback_dec_ins neunet::net_decimal exp(ins &&_Xx) { return _Xx.exp(); }
 
-neunet::net_decimal log(neunet::net_decimal &_Xx) { return _Xx.ln(); }
+// callback_dec_ins neunet::net_decimal log(ins &&_Xx) { return _Xx.ln(); }
 
-neunet::net_decimal sin(neunet::net_decimal &_Xx) { return _Xx.sin(); }
+// callback_dec_ins neunet::net_decimal sin(ins &&_Xx) { return _Xx.sin(); }
 
-neunet::net_decimal cos(neunet::net_decimal &_Xx) { return _Xx.cos(); }
+// callback_dec_ins neunet::net_decimal cos(ins &&_Xx) { return _Xx.cos(); }
 
 _STD_END

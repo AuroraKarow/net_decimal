@@ -56,7 +56,7 @@ struct net_decimal_data final {
                 os << 0;
             }
             if ((i + 1) == src.ft.length) while (!(seg_tmp % 10)) seg_tmp /= 10;
-            os << seg_tmp;
+            if (seg_tmp) os << seg_tmp;
         }
         return os;
     }
@@ -485,7 +485,7 @@ callback_dec_arg net_decimal_data dec_coe(const net_set<arg> &src, uint64_t ft_c
          seg_tmp = 0ull,
          ans_idx = ans_coe.length;
     if (dig_cnt) for (auto i = 0; i < dig_cnt; ++i) pow_cnt /= 10;
-    else if (ft_cnt) dig_cnt = NEUNET_DEC_DIG_MAX;
+    else if (ft_cnt) pow_cnt = 1;
     for (auto i = 0ull; i < ft_cnt; ++i) {
         seg_tmp += dec_carry(carry, src[--idx_tmp]) * pow_cnt;
         pow_cnt *= 10;
@@ -529,7 +529,7 @@ uint8_t dec_div(net_set<uint8_t> &divd, const net_set<uint8_t> &divr) {
     auto ans_coe = divd[0] / divr[0];
     if (ans_coe >= 10) 
     ans_coe = 9;
-    while (true) {
+    neunet_dec_loop {
         auto carry = 0ll;
         
         // for (auto i = 0ull; i < divd.length; ++i) std::cout << dec_to_string_coe(divd[i]); std::cout << '\n';
@@ -688,12 +688,11 @@ net_decimal_data dec_e10(uint64_t e10) {
     }
     auto seg_cnt = e10 / NEUNET_DEC_DIG_MAX + 1,
          dig_cnt = e10 % NEUNET_DEC_DIG_MAX;
+    ans.it.init(seg_cnt);
     if (!dig_cnt) {
-        ans.it.init(seg_cnt + 1);
-        ans.it[seg_cnt] = 1;
+        ans.it[seg_cnt - 1] = 1;
         return ans;
     }
-    ans.it.init(seg_cnt);
     seg_cnt = 1;
     for (auto i = 0; i < dig_cnt; ++i) seg_cnt *= 10;
     ans.it[ans.it.length - 1] = seg_cnt;

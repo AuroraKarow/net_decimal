@@ -8,7 +8,7 @@ using namespace neunet;
 #define NEUNET_CHRONO_TIME_POINT    std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now()).time_since_epoch().count()
 
 void dec_bit_lt_one(net_decimal_data &D, bool sta = false){
-    if (dec_dig_cnt(D, false) || !dec_dig_cnt(D, true) || (!(dec_dig_cnt(D, true) - 1) && D.it[0] == 0)) return;
+    if (D.ft.length || !D.it.length) return;
     if (!sta && D.it[D.it.length - 1] >= NEUNET_DEC_BIT_BAS) D.it.init(D.it.length + 1);
     int t = 0;
     for(uint64_t m = 0; m < D.it.length; m++) if(D.it[m] >= NEUNET_DEC_BIT_BAS) {
@@ -24,13 +24,12 @@ void dec_bit_lt_one(net_decimal_data &D, bool sta = false){
 }
 
 void dec_bit_rt_one(net_decimal_data &D, bool sta = false){
-    uint64_t k1 = NEUNET_DEC_BIT_BAS;
-    if (dec_dig_cnt(D, false) || !dec_dig_cnt(D, true) || (!(dec_dig_cnt(D, true) - 1) && D.it[0] == 0)) return;
+    if (D.ft.length || !D.it.length) return;
     uint64_t t = 0;
     for(uint64_t m = D.it.length; m > 0; m--) if(D.it[m - 1] % 2 == 1){ 
         D.it[m - 1] >>= 1;
         D.it[m - 1] += t;
-        t = k1;
+        t = NEUNET_DEC_BIT_BAS;
     } else{
         D.it[m - 1] >>= 1;
         D.it[m - 1] += t;
@@ -334,7 +333,7 @@ void main(){
     uint64_t k02 = 1;
     k02 <<= 62;
     uint64_t k03 = 1;
-    k03 <<= 59;
+    k03 <<= 55;
     uint64_t k = k01 + k02 + k03;
 	std::cout << "k:" << std::endl;
 	std::cout << k01 << std::endl;
@@ -366,13 +365,27 @@ void main(){
     dec_rt_move(K1, 63);
 	std::cout << "1: " << dec_to_string(k_sgn, K1) << std::endl;
 
-    // auto start = NEUNET_CHRONO_TIME_POINT;
-	// for(int a = 0;a < 1000000;a++){
-    //     dec_lt_move(k1, 2);
-    //     dec_rt_move(k1, 2); 
-    // }
-	// auto end = NEUNET_CHRONO_TIME_POINT;
-	// std::cout << "Time: " << end - start << std::endl;
+    auto start = NEUNET_CHRONO_TIME_POINT;
+	for(int a = 0;a < 1000000000;a++){
+        dec_lt_move(k2, 2);
+        dec_rt_move(k2, 2); 
+    }
+	auto end = NEUNET_CHRONO_TIME_POINT;
+	std::cout << "Time: " << end - start << std::endl;
+    start = NEUNET_CHRONO_TIME_POINT;
+	for(int a = 0;a < 1000000000;a++){
+        dec_lt_move(k1, 2);
+        dec_rt_move(k1, 2); 
+    }
+	end = NEUNET_CHRONO_TIME_POINT;
+	std::cout << "Time0: " << end - start << std::endl;
+    start = NEUNET_CHRONO_TIME_POINT;
+	for(int a = 0;a < 1000000000;a++){
+        k03 << 4;
+        k03 >> 4; 
+    }
+	end = NEUNET_CHRONO_TIME_POINT;
+	std::cout << "Time1: " << end - start << std::endl;
 	// std::cout << k1.it << std::endl;
 	//std::cout << "Tell: " << dec_to_string(k_sgn, k1 / k0) << std::endl;
     dec_bit_not(K);
