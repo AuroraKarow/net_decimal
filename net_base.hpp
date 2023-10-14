@@ -1,5 +1,10 @@
 NEUNET_BEGIN
 
+void net_assert(bool expression, const char *ty_name_space, const char *fn_name, const char *msg) { if (!expression) {
+    std::cerr << '[' << ty_name_space << "::" << fn_name << "][" << msg << ']' << std::endl;
+    std::abort();
+}}
+
 /* Pointer */
 
 callback_arg arg *ptr_init(uint64_t len) {
@@ -357,7 +362,10 @@ uint64_t num_cnt(uint64_t first, uint64_t second, uint64_t dilate = 0) {
 }
 
 long double num_rate(long double numerator, long double denominator) {
-    assert(denominator);
+    net_assert(denominator,
+               "neunet",
+               "num_rate",
+               "Denominator could not equal to 0.");
     return numerator / denominator;
 }
 
@@ -533,6 +541,18 @@ template <typename ... arg> ch_str str_cat(const ch_str fst, const ch_str snd, a
     auto curr_ans = str_cat(fst, snd);
     auto ans      = str_cat(curr_ans, src ...);
     ptr_reset(curr_ans);
+    return ans;
+}
+
+std::string str_construct(ch_str &&src) {
+    std::string ans = src;
+    ptr_reset(src);
+    return ans;
+}
+
+ch_str str_init(uint64_t len) {
+    auto ans = ptr_init<char>(len + 1);
+    ans[len] = '\0';
     return ans;
 }
 

@@ -46,20 +46,38 @@ long double pi_iter() {
     return ans;
 }
 
+long double Aout_R(long double R) { return 205 / (1 + 20000 / R); }
+
 int main(int argc, char *argv[], char *envp[]) {
     cout << "hello, world.\n" << endl;
     auto ch_tm_pt = NEUNET_CHRONO_TIME_POINT;
 
-    
+    // 114679544494614864124.4184414 9913644494614864424.411416186156441646
+    // 1135147821456932545178 9632515584713416829 117.84541758316865039744481535232
+    // 114079544040094610408604012404100840414.00009900130640449040000000800644024400114106186156
 
-    // 114679544494614864124 9913644494614864424
-    // bool sgn = false;
-    // net_decimal_base a, b;
-    // a.init("114679544494614864124");
-    // b.init("9913644494614864424");
-    // net_decimal_frac c, d;
-    // auto e = dec_add(sgn, a, true, b, true);
-    // cout << e.to_string(sgn) << endl;
+    auto s = false;
+    auto a = dec_init(s, "1135147821456932545178"),
+         b = dec_init(s,    "9632515584713416829");
+    auto c = dec_div_test(a, b, 0);
+    cout << endl;
+    cout << dec_to_string(false, c) << endl;
+    // auto c = dec_rem(a, b);
+    // cout << dec_to_string(false, c) << endl;
+    // cout << dec_to_string(false, a) << endl;
+
+    // net_decimal::division_precision = 64;
+    // cout << net_decimal::pi() << endl; // 3.141592653589793238462643383279502884197169|39937510582097494459231
+
+    // uint64_t test_round = 1000000;
+    // auto test_time = NEUNET_CHRONO_TIME_POINT;
+    // for (auto i = 0ull; i < test_round; ++i) auto c = dec_mul(a, b);
+    // auto test_end = NEUNET_CHRONO_TIME_POINT;
+    // cout << "[normal][" << test_round << "][" << test_end - test_time << "ms]" << std::endl;
+    // test_time = NEUNET_CHRONO_TIME_POINT;
+    // for (auto i = 0ull; i < test_round; ++i) auto c = dec_fft_mul(a, b);
+    // test_end = NEUNET_CHRONO_TIME_POINT;
+    // cout << "[fft][" << test_round << "][" << test_end - test_time << "ms]" << std::endl;
 
     // net_decimal a {-15},
     //             b {7};

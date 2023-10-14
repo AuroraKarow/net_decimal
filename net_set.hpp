@@ -45,7 +45,7 @@ public:
 
 protected:
     void value_copy(const net_set &src) {
-        if (src == *this) return;
+        if (&src == this) return;
         ptr_alter(ptr, len, src.len, false);
         ptr_copy(ptr, src.ptr, src.len);
         len = src.len;
@@ -89,7 +89,7 @@ public:
     }
     net_ptr_base<arg> ptr_array() const {
         net_ptr_base<arg> ans;
-        ans.ptr_base = ptr_copy(ptr, len);
+        ans.ptr_base = ptr_copy<arg>(ptr, len);
         ans.len      = len;
         return ans;
     }
@@ -213,11 +213,20 @@ public:
     }
     
     iterator end() const { return iterator(nullptr, 0); }
+
+    bool copy(uint64_t idx, const net_set<arg> &src, uint64_t src_idx, uint64_t copy_len) {
+        if (src_idx + copy_len > src.len || idx + copy_len > len) return false;
+        std::copy(src.ptr + src_idx, src.ptr + src_idx + copy_len, ptr + idx);
+        return true;
+    }
     
     void reset() { len = 0; ptr_reset(ptr); }
     
     arg &operator[](uint64_t idx) const {
-        assert(idx < len);
+        net_assert(idx < len,
+                   "net_set",
+                   "[]",
+                   "Index should be less than set length.");
         return *(ptr + idx);
     }
 
