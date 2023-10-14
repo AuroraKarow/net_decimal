@@ -32,7 +32,7 @@ protected:
         den = std::move(src.den);
     }
 
-    template <uint8_t opt_idx> static net_decimal binary_operator(const net_decimal &fst, const net_decimal &snd) {
+    template <uint64_t opt_idx> static net_decimal binary_operator(const net_decimal &fst, const net_decimal &snd) {
         net_decimal ans, fst_red, snd_red;
         if (!dec_is_zero(fst.den)) {
             fst_red = fst;
@@ -86,6 +86,86 @@ public:
         if (!sgn) return *this;
         auto ans = *this;
         ans.sgn  = false;
+        return ans;
+    }
+
+    net_decimal ln() const {
+        if (dec_is_zero(num) || dec_frac_is_one(num, den) || sgn) return {};
+        net_decimal ans;
+        ans.num = dec_series_ln(ans.sgn, num, division_precision);
+        if (dec_is_zero(den)) return ans;
+        auto sgn = false;
+        auto tmp = dec_series_ln(sgn, den, division_precision);
+        ans.num  = dec_sub(ans.sgn, ans.num, ans.sgn, ans.den, sgn);
+        ans.den.reset();
+        return ans;
+    }
+
+    net_decimal exp() const {
+        if (dec_is_zero(num)) return {1};
+        net_decimal ans;
+        ans.num = dec_series_exp(ans.sgn, num, den, sgn, division_precision);
+        return ans;
+    }
+
+    net_decimal sin() const {
+        net_decimal ans;
+        auto num_term = num,
+             den_term = den,
+             fra_form = dec_init(ans.sgn, 1);
+        ans.num = dec_series_sin_cos(ans.sgn, num, den, sgn, division_precision, num_term, den_term, fra_form);
+        return ans;
+    }
+
+    net_decimal cos() const {
+        net_decimal ans;
+        auto num_term = dec_init(ans.sgn, 1),
+             den_term = dec_init(ans.sgn, 0),
+             fra_form = den_term;
+        ans.num = dec_series_sin_cos(ans.sgn, num, den, sgn, division_precision, num_term, den_term, fra_form);
+        return ans;
+    }
+
+    net_decimal pow(const net_decimal &times) const {
+        if (dec_is_zero(num)) return {};
+        if (dec_is_one(num)){
+            if (!sgn) return {1};
+            if (dec_is_zero(times.den)) {
+                auto tmp = 0ull;
+                if (times.num.ft.length) tmp = times.num.ft[times.num.ft.length - 1];
+                else tmp = times.num.it[0];
+                if (tmp % 2) return {-1};
+                return {};
+            }
+            auto num_tmp = num,
+                 den_tmp = den;
+            dec_frac_red(num_tmp, den_tmp);
+            if (dec_is_zero(num_tmp)) {
+                net_decimal times_tmp;
+                times_tmp.num = std::move(num_tmp);
+                times_tmp.den = std::move(den_tmp);
+                return pow(times_tmp);
+            }
+            auto tmp = 0ull;
+            if (den_tmp.ft.length) tmp = den_tmp.ft[den_tmp.ft.length - 1];
+            else tmp = den_tmp.it[0];
+            if (!(tmp % 2)) return {};
+            // den = -1
+            if (num_tmp.ft.length) tmp = num_tmp.ft[num_tmp.ft.length - 1];
+            else tmp = num_tmp.it[0];
+            if (tmp % 2) return {1};
+            return {-1};
+        }
+        if (dec_frac_is_zero(times.num, times.den)) return {1};
+        net_decimal ans;
+        if (dec_frac_is_one(times.num, times.den)) {
+            if (!times.sgn) return *this;
+            ans.num = den;
+            ans.den = num;
+            if (dec_is_zero(den)) ans.num = dec_init(ans.sgn, 1);
+            return ans;
+        }
+        ans.num = dec_series_pow(ans.sgn, num, den, sgn, times.num, times.den, times.sgn, division_precision);
         return ans;
     }
 
@@ -333,10 +413,6 @@ public:
         if (dec_is_zero(src.den)) return os << src.num;
         return os << dec_div(src.num, src.den, src.division_precision);
     }
-
-protected:
-
-public:
 };
 
 net_decimal operator""_d(const char *src, size_t len) { return net_decimal(std::string(src)); }
@@ -347,16 +423,16 @@ NEUNET_END
 
 _STD_BEGIN
 
+neunet::net_decimal log(const neunet::net_decimal &_Xx) { return _Xx.ln(); }
+
 neunet::net_decimal abs(const neunet::net_decimal &_Xx) { return _Xx.abs(); }
 
-// neunet::net_decimal pow(const neunet::net_decimal &_Xx, const neunet::net_decimal &_Yx) { return neunet::net_decimal::dec_pow(_Xx, _Yx); }
+neunet::net_decimal exp(const neunet::net_decimal &_Xx) { return _Xx.exp(); }
 
-// neunet::net_decimal exp(const neunet::net_decimal &_Xx) { return neunet::net_decimal::dec_exp(_Xx); }
+neunet::net_decimal sin(const neunet::net_decimal &_Xx) { return _Xx.sin(); }
 
-// neunet::net_decimal log(const neunet::net_decimal &_Xx) { return neunet::net_decimal::dec_ln(_Xx); }
+neunet::net_decimal cos(const neunet::net_decimal &_Xx) { return _Xx.cos(); }
 
-// neunet::net_decimal sin(const neunet::net_decimal &_Xx) { return neunet::net_decimal::dec_sin(_Xx); }
-
-// neunet::net_decimal cos(const neunet::net_decimal &_Xx) { return neunet::net_decimal::dec_cos(_Xx); }
+neunet::net_decimal pow(const neunet::net_decimal &_Xx, const neunet::net_decimal &_Yx) { return _Xx.pow(_Yx); }
 
 _STD_END

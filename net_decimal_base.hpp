@@ -712,6 +712,7 @@ net_decimal_data dec_series_ln_2(bool &ans_sgn, const net_decimal_data &src, uin
 }
 
 net_decimal_data dec_series_ln(bool &ans_sgn, const net_decimal_data &src, uint64_t prec) {
+    if (dec_is_zero(src)) return {};
     auto one = dec_init(ans_sgn, 1);
     auto cmp = dec_comp(src, one);
     if (cmp == NEUNET_DEC_CMP_EQL) return {};
@@ -733,15 +734,15 @@ net_decimal_data dec_series_exp(bool &ans_sgn, const net_decimal_data &src_num, 
          den_form = src_den;
     dec_frac_red(num_form, den_form);
     
-    auto two = dec_init(ans_sgn, 2),
-         hlf = dec_init(ans_sgn, 0.5),
-         ten = dec_init(ans_sgn, 10);
-    auto cnt = 0;
-    while (dec_comp(num_form, ten) == NEUNET_DEC_CMP_GTR) {
-        num_form = dec_mul(num_form, hlf);
-        ++cnt;
-    }
-    prec         *= cnt;
+    // auto two = dec_init(ans_sgn, 2),
+    //      hlf = dec_init(ans_sgn, 0.5),
+    //      ten = dec_init(ans_sgn, 10);
+    // auto cnt = 0;
+    // while (dec_comp(num_form, ten) == NEUNET_DEC_CMP_GTR) {
+    //     num_form = dec_mul(num_form, hlf);
+    //     ++cnt;
+    // }
+    // prec         *= cnt;
 
     auto num_term = num_form,
          den_term = den_form,
@@ -770,8 +771,8 @@ net_decimal_data dec_series_exp(bool &ans_sgn, const net_decimal_data &src_num, 
     } while (dec_series_check(num_term, tmp, prec));
     auto ans = dec_div(ans_sgn, num, ans_sgn, den, false, prec);
     
-    for (auto i = 0; i < cnt; ++i) ans = dec_mul(ans, ans);
-    dec_truncate(ans, 32);
+    // for (auto i = 0; i < cnt; ++i) ans = dec_mul(ans, ans);
+    // dec_truncate(ans, 32);
 
     return ans;
 }
@@ -781,7 +782,7 @@ net_decimal_data dec_series_exp(bool &ans_sgn, const net_decimal_data &src_num, 
  * den_term sine - src_den, cosine - 0
  * fra_form sine - 1      , cosine - 0
  */
-net_decimal_data dec_series_sin_cos(bool &ans_sgn, const net_decimal_data &src_num, const net_decimal_data &src_den, bool src_sgn, uint64_t prec, net_decimal_data &num_term, net_decimal_data &den_term, net_decimal_data &fra_form) {
+net_decimal_data dec_series_sin_cos(bool &ans_sgn, const  net_decimal_data &src_num, const net_decimal_data &src_den, bool src_sgn, uint64_t prec, net_decimal_data &num_term, net_decimal_data &den_term, net_decimal_data &fra_form) {
     auto sers_sgn = false;
     auto one_form = dec_init(ans_sgn, 1);
     if (dec_is_zero(den_term)) den_term = one_form;
@@ -808,6 +809,74 @@ net_decimal_data dec_series_sin_cos(bool &ans_sgn, const net_decimal_data &src_n
         den = dec_mul(den, tmp);
     } while (dec_series_check(num_term, tmp, prec));
     return dec_div(ans_sgn, num, ans_sgn, den, false, prec);
+}
+
+/* (2k + 1) a = {1, 2}
+ * as   sin x = 0
+ * then x = kπ (k ∈ Z)
+ * period = {1, 2} ⊆ Z
+ */
+bool dec_series_pow_check(const net_decimal_data &times_num, const net_decimal_data &times_den, bool times_sgn, const net_decimal_data &period) {
+    auto k_num = times_den,
+         k_den = times_num;
+    if (dec_is_zero(k_num)) k_num = period;
+    else k_num = dec_mul(k_num, period);
+    k_num = dec_sub(times_sgn, k_num, times_sgn, k_den, false);
+    k_den = dec_mul(k_den, dec_init(times_sgn, 2));
+    dec_frac_red(k_num, k_den);
+    return dec_is_zero(k_den);
+}
+
+// x ^ a, a = times, x = base
+net_decimal_data dec_series_pow(bool &ans_sgn, const net_decimal_data &base_num, const net_decimal_data &base_den, bool base_sgn, const net_decimal_data &times_num, const net_decimal_data &times_den, bool times_sgn, uint64_t prec) {
+    if (dec_is_zero(base_num)) return {}; // base = 0
+    if (base_sgn) {
+        // base < 0
+        auto prev_sgn = false,
+             perd_sgn = false;
+        auto prev_ans = dec_series_pow(prev_sgn, base_num, base_den, false, times_num, times_den, times_sgn, prec),
+             val_term = dec_init(perd_sgn, 1);
+        if (dec_series_pow_check(times_num, times_den, times_sgn, val_term)) goto cplx_pow;
+        val_term = dec_init(perd_sgn, 2);
+        if (!dec_series_pow_check(times_num, times_den, times_sgn, val_term)) goto null_ret;
+        cplx_pow: {
+            auto num = dec_init(ans_sgn, 1),
+                 den = dec_init(ans_sgn, 0),
+                 fra = dec_init(ans_sgn, 0),
+                 tmp = dec_mul(val_term, dec_series_pi::value(prec)),
+                 ans = dec_mul(ans_sgn, dec_series_sin_cos(perd_sgn, tmp, dec_init(perd_sgn, 0), perd_sgn, prec, num, den, fra), perd_sgn, prev_ans, prev_sgn);
+            dec_truncate(ans, prec); // truncate the float point part for specified precision
+            return ans;
+        } null_ret: return {};
+    }
+    // base > 0
+    auto num_time = times_num,
+         den_time = times_den,
+         int_time = dec_frac_int_part(num_time, den_time),
+         one_term = dec_init(ans_sgn, 1),
+         prev_num = dec_init(ans_sgn, 0),
+         prev_den = prev_num;
+    auto prev_sgn = false,
+         rear_sgn = false;
+    // base * (int_time + num_time / dem_time) = (base ^ int_time) e ^ (num_time / den_time)ln(base)
+    if (!dec_is_zero(int_time)) {
+        // base ^ int_time
+        prev_num = base_num;
+        prev_den = base_den;
+        // TODO: optimize -> integral times could be a power of 2
+        for (auto i = dec_init(ans_sgn, 0); dec_comp(i, int_time) == NEUNET_DEC_CMP_LES; i = dec_add(i, one_term)) {
+            prev_num = dec_mul(prev_num, base_num);
+            if (!dec_is_zero(base_den)) prev_den = dec_mul(prev_den, base_den);
+        }
+        prev_sgn = int_time.it[0] % 2;
+    }
+    // ln(base_num) - ln(base_den)
+    num_time = dec_mul(num_time, dec_add(ans_sgn, dec_series_ln(rear_sgn, base_num, prec), false, dec_series_ln(rear_sgn, base_den, prec), true));
+    rear_sgn = rear_sgn != times_sgn;
+    auto ans = dec_series_exp(rear_sgn, num_time, den_time, rear_sgn, prec);
+    if (!dec_is_zero(int_time)) ans = dec_mul(ans_sgn, dec_div(prev_num, prev_den, prec), prev_sgn != base_sgn, ans, rear_sgn);
+    dec_truncate(ans, prec); // truncate the float point part for specified precision
+    return ans;
 }
 
 NEUNET_END
