@@ -86,9 +86,9 @@ NEUNET_BEGIN
 std::atomic_uint64_t net_decimal::division_precision = 32;
 std::atomic_bool     net_decimal::fraction_reduct    = false;
 
-neunet::net_decimal operator "" _d(const char *src, uint64_t len) { return neunet::net_decimal(std::string(src)); }
-neunet::net_decimal operator "" _d(long double src) { return neunet::net_decimal(src); }
-neunet::net_decimal operator "" _d(uint64_t src) { return neunet::net_decimal(src); }
+net_decimal operator "" _d(const char *src, uint64_t len) { return net_decimal(std::string(src)); }
+net_decimal operator "" _d(long double src) { return net_decimal(src); }
+net_decimal operator "" _d(uint64_t src) { return net_decimal(src); }
 
 NEUNET_END
 

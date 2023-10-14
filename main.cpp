@@ -47,6 +47,12 @@ long double pi_iter() {
 
 long double Aout_R(long double R) { return 205 / (1 + 20000 / R); }
 
+struct outer {
+    static struct {
+        int inner_val {0};
+    } inner_inst;
+};
+
 int main(int argc, char *argv[], char *envp[]) {
     cout << "hello, world.\n" << endl;
     auto ch_tm_pt = NEUNET_CHRONO_TIME_POINT;
@@ -79,15 +85,15 @@ int main(int argc, char *argv[], char *envp[]) {
     // test_end = NEUNET_CHRONO_TIME_POINT;
     // cout << "[fft][" << test_round << "][" << test_end - test_time << "ms]" << std::endl;
 
-    net_decimal a {-15},
-                b {-7};
-    b.modulus = true;
-    auto c = 15;
-    c %= b;
-    cout << c << endl;
+    // net_decimal a {-15},
+    //             b {-7};
+    // b.modulus = true;
+    // auto c = 15;
+    // c %= b;
+    // cout << c << endl;
 
-    // net_decimal::division_precision = 128;
-    // cout << ("12.163"_d).exp() << endl;
+    net_decimal::division_precision = 64;
+    cout << ("1.35"_d).sin() << endl;
 
     // net_decimal::fft_mode = true;
     // net_decimal a = -0.216,

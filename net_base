@@ -1,10 +1,9 @@
 #pragma once
-#ifndef __LIB_BASE__
-#define __LIB_BASE__
+#ifndef __NET_BASE__
+#define __NET_BASE__
 
 #include <chrono>
 #include <random>
-#include <assert.h>
 
 #define NEUNET_BEGIN    namespace neunet {
 #define NEUNET_END      }
@@ -18,7 +17,7 @@
 #define ul_ptr          unsigned long long *
 #define lf_ptr          long double *
 
-std::default_random_engine lib_rand_e;
+NEUNET_BEGIN std::default_random_engine lib_rand_e; NEUNET_END
 
 #include "net_base.hpp"
 
