@@ -2,10 +2,17 @@ NEUNET_BEGIN
 
 class net_decimal {
 public:
+    // Change the operation mode between modulus and remainder operation - '%'
     bool modulus_mode = false;
+
+    // Default precision of division operation for decimal initialization
+    inline static uint64_t default_division_precision = 64;
     
-    uint64_t binary_bit_set     = 0,
-             division_precision = 64;
+    // Binary bit count for bit operation. If this value is 0, bit count would be changed automatically.
+    uint64_t binary_bit_set = 0;
+
+    // Float point digit count for division quotient
+    uint64_t division_precision = default_division_precision;
 
     __declspec(property(get = abs))      net_decimal absolute;
     __declspec(property(get = to_float)) long double float_point_format;
@@ -176,7 +183,7 @@ public:
         den.reset();
         modulus_mode       = false;
         binary_bit_set     = 0;
-        division_precision = 64;
+        division_precision = default_division_precision;
     }
 
     ~net_decimal() { reset(); }
@@ -313,10 +320,14 @@ public:
         return ans;
     }
     net_decimal &operator<<=(const net_decimal &bit) {
-        net_decimal_data bit_cnt;
-        if (!dec_frac_bit_verify(bit_cnt, bit.num, bit.den)) return *this;
-        reduct();
-        if (dec_is_zero(den)) dec_bit_lsh(num, bit_cnt.it[0], binary_bit_set);
+        if (dec_is_zero(bit.den)) {
+            if (bit.num.ft.length) return *this;
+            reduct();
+            if (dec_is_zero(den)) dec_bit_lsh(num, bit.num, binary_bit_set);
+            return *this;
+        }
+        net_decimal bit_cnt;
+        if (dec_frac_bit_verify(bit_cnt.num, bit.num, bit.den)) return *this <<= bit_cnt;
         return *this;
     }
     callback_dec_arg friend arg operator<<=(arg &src, const net_decimal &bit) {
@@ -332,10 +343,14 @@ public:
         return ans;
     }
     net_decimal &operator>>=(const net_decimal &bit) {
-        net_decimal_data bit_cnt;
-        if (!dec_frac_bit_verify(bit_cnt, bit.num, bit.den)) return *this;
-        reduct();
-        if (dec_is_zero(den)) dec_bit_rsh(num, bit_cnt.it[0], binary_bit_set);
+        if (dec_is_zero(bit.den)) {
+            if (bit.num.ft.length) return *this;
+            reduct();
+            if (dec_is_zero(den)) dec_bit_rsh(num, bit.num, binary_bit_set);
+            return *this;
+        }
+        net_decimal bit_cnt;
+        if (dec_frac_bit_verify(bit_cnt.num, bit.num, bit.den)) return *this >>= bit_cnt;
         return *this;
     }
     callback_dec_arg friend arg operator>>=(arg &src, const net_decimal &bit) {

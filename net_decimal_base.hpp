@@ -60,6 +60,11 @@ net_decimal_data dec_div(bool &ans_sgn, const net_decimal_data &divd, bool divd_
     return dec_div(divd, divr, prec);
 }
 
+// kp
+net_decimal_data dec_bit_k0(bool sgn = false) { return dec_init(sgn, 0); }
+// k, k1
+net_decimal_data dec_bit_k1(bool sgn = false) { return dec_init(sgn, 1); }
+
 /** 
  * @brief Left shift
  * @param src   [IO]    source
@@ -68,6 +73,7 @@ net_decimal_data dec_div(bool &ans_sgn, const net_decimal_data &divd, bool divd_
  */
 void dec_bit_lsh(net_decimal_data &src, uint64_t bit = 1, bool sta = false){
     if (src.ft.length || !src.it.length) return;
+    if (!(src.it.length - 1) && log(src.it[0]) + bit < 64) { src.it[0] <<= bit; return; }
     uint64_t b = bit % NEUNET_DEC_DIG_MAX,
              B = bit / NEUNET_DEC_DIG_MAX,
              l = src.it.length,
@@ -101,9 +107,33 @@ void dec_bit_lsh(net_decimal_data &src, uint64_t bit = 1, bool sta = false){
     l = src.it.length;
     // std::cout << "B" << std::endl;
     if (!sta) {
-        while(!src.it[--l]) continue;
+        while(!src.it[--l] && l > 0) continue;
+        if (!src.it[l]){
+            src.it.reset();
+            return;
+        }
         src.it = src.it.sub_set(0, l);
     }
+}
+void dec_bit_lsh(net_decimal_data &src, net_decimal_data bit, bool sta = false){
+    if (src.ft.length || !src.it.length || bit.ft.length || !bit.it.length) return;
+    if (!(src.it.length - 1) && !(bit.it.length - 1) && log(src.it[0]) + bit.it[0] < 64) { src.it[0] <<= bit.it[0]; return; }
+    bool sgn = false;
+    if (!(bit.it.length - 1)){
+        dec_bit_lsh(src, bit.it[0]);
+        return;
+    }
+    net_decimal_data b = dec_init(sgn, NEUNET_DEC_SEG_MAX),
+                     B,
+                     z = dec_bit_k0(),
+                     o = dec_bit_k1();
+    B = dec_div(src, b, 0);
+    B.ft.reset();
+    uint64_t l = src.it[0],
+             T = 0,
+             t;
+    for (auto i = z; dec_comp(i, B) == NEUNET_DEC_CMP_LES; i = dec_add(i, o)){ dec_bit_lsh(src, NEUNET_DEC_SEG_MAX); }
+    dec_bit_lsh(src, bit.it[0]);
 }
 
 /**
@@ -114,6 +144,7 @@ void dec_bit_lsh(net_decimal_data &src, uint64_t bit = 1, bool sta = false){
  */
 void dec_bit_rsh(net_decimal_data &src, uint64_t bit = 1, bool sta = false){
     if (src.ft.length || !src.it.length) return;
+    if (!(src.it.length - 1)) { src.it[0] >>= bit; return; }
     uint64_t b = bit % NEUNET_DEC_DIG_MAX,
              B = bit / NEUNET_DEC_DIG_MAX,
              l = src.it.length,
@@ -144,9 +175,42 @@ void dec_bit_rsh(net_decimal_data &src, uint64_t bit = 1, bool sta = false){
     }
     // std::cout << "B" << std::endl;
     if (!sta) {
-        while(!src.it[--l]) continue;
+        while(!src.it[--l] && l > 0) continue;
+        if (!src.it[l]){
+            src.it.reset();
+            return;
+        }
         src.it = src.it.sub_set(0, l);
     }
+}
+void dec_bit_rsh(net_decimal_data &src, net_decimal_data bit, bool sta = false){
+    if (src.ft.length || !src.it.length || bit.ft.length || !bit.it.length) return;
+    if (!(src.it.length - 1)){
+        if (!(bit.it.length - 1)) {
+            src.it[0] >>= bit.it[0];
+            return; 
+        }
+        else {
+            src.it.reset();
+            return; 
+        }
+    }
+    bool sgn = true;
+    if (!(bit.it.length - 1)){
+        dec_bit_rsh(src, bit.it[0]);
+        return;
+    }
+    net_decimal_data b = dec_init(sgn, NEUNET_DEC_SEG_MAX),
+             B,
+             z = dec_bit_k0(),
+             o = dec_bit_k1();
+    B = dec_div(src, b, 0);
+    B.ft.reset();
+    uint64_t l = src.it[0],
+             T = 0,
+             t;
+    for (auto i = z; dec_comp(i, B) == NEUNET_DEC_CMP_LES; i = dec_add(i, o)){ dec_bit_rsh(src, NEUNET_DEC_SEG_MAX); }
+    dec_bit_rsh(src, bit.it[0]);
 }
 
 void dec_bit_lsh1(net_decimal_data &src, bool sta = false){
@@ -180,11 +244,6 @@ void dec_bit_rsh1(net_decimal_data &src, bool sta = false){
     }
     if (!sta && !src.it[src.it.length - 1]) src.it.length - 1 ? src.it[src.it.length - 2] < NEUNET_DEC_BIT_TOP ? src.it.init(src.it.length - 1, true) : src.it.init(src.it.length, true) : src.it.init(src.it.length - 1, true);
 }
-
-// kp
-net_decimal_data dec_bit_k0(bool sgn = false) { return dec_init(sgn, 0); }
-// k, k1
-net_decimal_data dec_bit_k1(bool sgn = false) { return dec_init(sgn, 1); }
 
 uint64_t dec_bit_cnt(net_decimal_data &src){
     uint64_t b = 0;
@@ -559,8 +618,7 @@ bool dec_frac_bit_verify(net_decimal_data &ans, const net_decimal_data &num, con
     if (dec_is_zero(den) && num.ft.length) return false;
     auto tmp = num;
     ans      = dec_rem(tmp, den);
-    if (!dec_is_zero(tmp)) return false;
-    return true;
+    return dec_is_zero(tmp);
 }
 
 bool dec_series_check(const net_decimal_data &divd, const net_decimal_data &divr, uint64_t prec) { return dec_comp(dec_e10_lsh(divd, prec), divr) == NEUNET_DEC_CMP_GTR; }
@@ -812,7 +870,7 @@ net_decimal_data dec_series_sin_cos(bool &ans_sgn, const  net_decimal_data &src_
 }
 
 /* (2k + 1) a = {1, 2}
- * as   sin x = 0
+ * as sin x = 0
  * then x = kπ (k ∈ Z)
  * period = {1, 2} ⊆ Z
  */
