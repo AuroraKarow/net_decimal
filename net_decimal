@@ -1,0 +1,31 @@
+/* net_deciaml
+ * The data structure is designed by Yida Xian
+ * Algorithm is instantiated by Diansheng Liao
+ */
+
+#pragma once
+
+#ifndef __NET_DECIMAL__
+#define __NET_DECIMAL__
+
+#include "net_set"
+
+#define NEUNET_DEC_PI       3.1415926535897932
+
+#define NEUNET_DEC_SEG_MAX  0x8ac7230489e80000
+#define NEUNET_DEC_DIG_MAX  0x0013
+#define NEUNET_DEC_VLD_DIG  0x0010
+
+#define NEUNET_DEC_CMP_EQL  0x0000
+#define NEUNET_DEC_CMP_LES  0x0001
+#define NEUNET_DEC_CMP_GTR  0x0002
+
+#define callback_dec_arg    template <typename arg, typename number_arg>
+
+#include "net_decimal.hpp"
+
+neunet::net_decimal operator "" _d(const char *src) { return neunet::net_decimal(src); }
+neunet::net_decimal operator "" _d(long double src) { return neunet::net_decimal(src); }
+neunet::net_decimal operator "" _d(uint64_t src) { return neunet::net_decimal(src); }
+
+#endif
