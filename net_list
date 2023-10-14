@@ -1,9 +1,0 @@
-#pragma once
-
-#ifndef __NET_LIST__
-#define __NET_LIST__
-
-#include "net_set"
-#include "net_list.hpp"
-
-#endif

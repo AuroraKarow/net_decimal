@@ -15,8 +15,10 @@
 
 #define NEUNET_DEC_SEG_MAX  0x8ac7230489e80000
 
-#define NEUNET_DEC_DIV_SEG  0x3b9aca00
-#define NUENET_DEC_DIV_DIG  0x0009
+#define NEUNET_DEC_MUL_POW  0x000f4240ull
+#define NEUNET_DEC_MUL_SQR  (NEUNET_DEC_MUL_POW * NEUNET_DEC_MUL_POW)
+#define NEUNET_DEC_MUL_CUB  (NEUNET_DEC_MUL_SQR * NEUNET_DEC_MUL_POW)
+#define NEUNET_DEC_MUL_END  (NEUNET_DEC_MUL_POW * 0x000a)
 
 #define NEUNET_DEC_DIG_MAX  0x0013
 #define NEUNET_DEC_VLD_DIG  0x0010
@@ -27,8 +29,6 @@
 
 #define neunet_t_arr_len(type, arg) type[sizeof(arg) / sizeof(type)]
 
-#define neunet_complex              std::complex<long double>
-
 #define neunet_dec_type(type)       std::remove_reference_t<type>
 
 #define neunet_dec_ref(type)        std::is_same_v<neunet::net_decimal,\
@@ -37,10 +37,7 @@
 #define neunet_dec_num(type)        std::is_arithmetic_v<\
                                     neunet_dec_type(type)>
 
-#define neunet_dec_is_complex(arg)  std::is_same_v<neunet_complex,\
-                                                   neunet_dec_type(arg)>
-#define neunet_number_arg           neunet_dec_num(arg) ||\
-                                    neunet_dec_is_complex(arg)
+#define neunet_number_arg           neunet_dec_num(arg)
 #define neunet_dec_enable(expr)     = std::enable_if_t<expr>
 #define callback_dec_arg            template<typename arg,\
                                              typename neunet_dec_enable\
@@ -77,6 +74,10 @@
                                              typename snd_dec_t,\
                                              typename neunet_dec_ref_s(fst_dec_t,\
                                                                        snd_dec_t)>
+
+#define callback_dec_arg_ref        template<typename arg,\
+                                             typename neunet_dec_enable\
+                                             (std::is_arithmetic_v<arg>)>
 
 #include "net_decimal.hpp"
 

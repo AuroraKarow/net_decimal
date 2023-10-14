@@ -5,7 +5,6 @@
 #pragma once
 
 #include <iostream>
-#include "async"
 #include "net_decimal"
 
 #include <intrin.h>
@@ -55,19 +54,20 @@ int main(int argc, char *argv[], char *envp[]) {
     // 114679544494614864124.4184414 9913644494614864424.411416186156441646
     // 1135147821456932545178 9632515584713416829 117.84541758316865039744481535232
     // 114079544040094610408604012404100840414.00009900130640449040000000800644024400114106186156
-
-    auto s = false;
-    auto a = dec_init(s, "1135147821456932545178"),
-         b = dec_init(s,    "9632515584713416829");
-    auto c = dec_div_test(a, b, 0);
-    cout << endl;
-    cout << dec_to_string(false, c) << endl;
+    
+    // auto s = false;
+    // auto a = dec_init(s, "1135147821456932545178"),
+    //      b = dec_init(s,    "9632515584713416829");
     // auto c = dec_rem(a, b);
     // cout << dec_to_string(false, c) << endl;
     // cout << dec_to_string(false, a) << endl;
+    // auto c = dec_gcd(a, b);
+    // if (c) cout << dec_to_string(false, b) << endl;
+    // else cout << dec_to_string(false, a) << endl;
 
-    // net_decimal::division_precision = 64;
-    // cout << net_decimal::pi() << endl; // 3.141592653589793238462643383279502884197169|39937510582097494459231
+    // net_decimal::division_precision = 130;
+    // auto pi_val = net_decimal::pi();
+    // cout << pi_val << endl;
 
     // uint64_t test_round = 1000000;
     // auto test_time = NEUNET_CHRONO_TIME_POINT;
@@ -79,14 +79,15 @@ int main(int argc, char *argv[], char *envp[]) {
     // test_end = NEUNET_CHRONO_TIME_POINT;
     // cout << "[fft][" << test_round << "][" << test_end - test_time << "ms]" << std::endl;
 
-    // net_decimal a {-15},
-    //             b {7};
-    // b.modulus = true;
-    // auto c = -15;
-    // c %= b;
-    // cout << c << endl;
+    net_decimal a {-15},
+                b {-7};
+    b.modulus = true;
+    auto c = 15;
+    c %= b;
+    cout << c << endl;
 
-    // cout << (17_d).ln() << endl;
+    // net_decimal::division_precision = 128;
+    // cout << ("12.163"_d).exp() << endl;
 
     // net_decimal::fft_mode = true;
     // net_decimal a = -0.216,

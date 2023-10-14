@@ -1,5 +1,10 @@
 NEUNET_BEGIN
 
+callback_args static void net_print(arg &&para, args &&...paras) {
+    std::cout << para;
+    if constexpr (sizeof...(args) > 0) net_print(paras...);
+}
+
 void net_assert(bool expression, const char *ty_name_space, const char *fn_name, const char *msg) { if (!expression) {
     std::cerr << '[' << ty_name_space << "::" << fn_name << "][" << msg << ']' << std::endl;
     std::abort();
