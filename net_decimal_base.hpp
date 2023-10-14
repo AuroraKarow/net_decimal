@@ -563,20 +563,10 @@ bool dec_frac_bit_verify(net_decimal_data &ans, const net_decimal_data &num, con
     return true;
 }
 
-bool dec_series_check(const net_decimal_data &divd, const net_decimal_data &divr, uint64_t prec_seg, uint64_t prec_rem) {
-    if (divd.it.length >= divr.it.length) return true;
-    if (divd.it.length) {
-        if (divr.it.length - divd.it.length - 1 < prec_seg) return true;
-        return (NEUNET_DEC_DIG_MAX - std::log10(divd.it[divd.it.length - 1]) - 1) < prec_rem;
-    }
-    auto seg_cnt = 0ull;
-    while (!divd.ft[seg_cnt]) ++seg_cnt;
-    if (seg_cnt < prec_seg) return true;
-    return (NEUNET_DEC_DIG_MAX - std::log10(divd.ft[seg_cnt]) - 1) < prec_rem;
-}
+bool dec_series_check(const net_decimal_data &divd, const net_decimal_data &divr, uint64_t prec) { return dec_comp(dec_e10_lsh(divd, prec), divr) == NEUNET_DEC_CMP_GTR; }
 
 // NOT thread safety
-struct net_decimal_prec {
+struct dec_series_prec {
 private: inline static net_set<net_decimal_data> prec {};
 
 public: static net_decimal_data value(uint64_t precision) {
@@ -594,7 +584,7 @@ public: static net_decimal_data value(uint64_t precision) {
 };
 
 // NOT thread safety
-struct net_decimal_pi {
+struct dec_series_pi {
 private:
     inline static bool on  = false,
                        sgn = false;
@@ -653,7 +643,7 @@ public: static net_decimal_data value(uint64_t precision) {
 };
 
 // NOT thread safety
-struct net_decimal_ln4 {
+struct dec_series_ln4 {
 private:
     inline static bool sgn = false;
 
@@ -671,8 +661,6 @@ private:
 public: static net_decimal_data value(uint64_t precision) {
     if (precision <= prec) return ans;
     // auto iter_cnt = 0ull;
-    auto prec_seg = precision / NEUNET_DEC_DIG_MAX,
-         preg_rem = precision % NEUNET_DEC_DIG_MAX;
     do {
         if (dec_comp(den, den_term) == NEUNET_DEC_CMP_EQL) num = dec_add(num, num_term);
         else {
@@ -682,7 +670,7 @@ public: static net_decimal_data value(uint64_t precision) {
         // ++iter_cnt;
         num_term = dec_mul(num_term, num_form);
         den_term = dec_add(den_term, den_form);
-    } while (dec_series_check(num_term, den_term, prec_seg, preg_rem));
+    } while (dec_series_check(num_term, den_term, prec));
     prec = precision;
     ans  = dec_mul(den_form, dec_div(num, den, prec));
     // std::cout << "next ln4 - " << iter_cnt << std::endl;
@@ -690,11 +678,8 @@ public: static net_decimal_data value(uint64_t precision) {
 }
 };
 
-net_decimal_data dec_ln_2(bool &ans_sgn, const net_decimal_data &src, uint64_t prec) {
+net_decimal_data dec_series_ln_2(bool &ans_sgn, const net_decimal_data &src, uint64_t prec) {
     // auto iter_cnt = 0ull;
-    auto prec_seg = prec / NEUNET_DEC_DIG_MAX,
-         prec_rem = prec % NEUNET_DEC_DIG_MAX;
-
     auto form_sgn = false,
          term_sgn = false,
          coef_sgn = false;
@@ -721,16 +706,16 @@ net_decimal_data dec_ln_2(bool &ans_sgn, const net_decimal_data &src, uint64_t p
         den_term = dec_add(den_term, den_form);
         coef_sgn = !coef_sgn;
         // ++iter_cnt;
-    } while (dec_series_check(num_term, den_term, prec_seg, prec_rem));
+    } while (dec_series_check(num_term, den_term, prec));
     // std::cout << "next ln2 - " << iter_cnt << std::endl;
     return dec_div(ans_sgn, num, ans_sgn, den, false, prec);
 }
 
-net_decimal_data dec_ln(bool &ans_sgn, const net_decimal_data &src, uint64_t prec) {
+net_decimal_data dec_series_ln(bool &ans_sgn, const net_decimal_data &src, uint64_t prec) {
     auto one = dec_init(ans_sgn, 1);
     auto cmp = dec_comp(src, one);
     if (cmp == NEUNET_DEC_CMP_EQL) return {};
-    if (cmp == NEUNET_DEC_CMP_LES) return dec_ln_2(ans_sgn, src, prec);
+    if (cmp == NEUNET_DEC_CMP_LES) return dec_series_ln_2(ans_sgn, src, prec);
     auto ans = src,
          cnt = dec_init(ans_sgn, 0),
          ofs = dec_init(ans_sgn, 0.25);
@@ -738,12 +723,12 @@ net_decimal_data dec_ln(bool &ans_sgn, const net_decimal_data &src, uint64_t pre
         ans = dec_mul(ans, ofs);
         cnt = dec_add(cnt, one);
     }
-    ans = dec_ln_2(ans_sgn, ans, prec);
-    return dec_add(ans_sgn, ans, ans_sgn, dec_mul(cnt, net_decimal_ln4::value(prec)), false);
+    ans = dec_series_ln_2(ans_sgn, ans, prec);
+    return dec_add(ans_sgn, ans, ans_sgn, dec_mul(cnt, dec_series_ln4::value(prec)), false);
 }
 
 
-net_decimal_data dec_exp(bool &ans_sgn, const net_decimal_data &src_num, const net_decimal_data &src_den, bool src_sgn, uint64_t prec) {
+net_decimal_data dec_series_exp(bool &ans_sgn, const net_decimal_data &src_num, const net_decimal_data &src_den, bool src_sgn, uint64_t prec) {
     auto num_form = src_num,
          den_form = src_den;
     dec_frac_red(num_form, den_form);
@@ -758,8 +743,6 @@ net_decimal_data dec_exp(bool &ans_sgn, const net_decimal_data &src_num, const n
     }
     prec         *= cnt;
 
-    auto prec_seg = prec / NEUNET_DEC_DIG_MAX,
-         prec_rem = prec % NEUNET_DEC_DIG_MAX;
     auto num_term = num_form,
          den_term = den_form,
          fra_term = dec_init(ans_sgn, 1),
@@ -784,7 +767,7 @@ net_decimal_data dec_exp(bool &ans_sgn, const net_decimal_data &src_num, const n
         fra_term = dec_mul(fra_term, frac_cnt);
         num_term = dec_mul(term_sgn, num_term, term_sgn, num_form, src_sgn);
         den_term = dec_mul(den_term, den_form);
-    } while (dec_series_check(num_term, tmp, prec_seg, prec_rem));
+    } while (dec_series_check(num_term, tmp, prec));
     auto ans = dec_div(ans_sgn, num, ans_sgn, den, false, prec);
     
     for (auto i = 0; i < cnt; ++i) ans = dec_mul(ans, ans);
@@ -793,40 +776,38 @@ net_decimal_data dec_exp(bool &ans_sgn, const net_decimal_data &src_num, const n
     return ans;
 }
 
-net_decimal_data dec_sin_cos(bool &ans_sgn, const net_decimal_data &src_num, const net_decimal_data &src_den, bool src_sgn, net_decimal_data &u, net_decimal_data &v, net_decimal_data &b, uint64_t prec) {
-    auto p_sgn = false,
-         u_sgn = false,
-         m_sgn = false,
-         c_sgn = false;
-    auto c = dec_init(ans_sgn, 1),
-         q = c,
-         p = dec_init(ans_sgn, 0),
-         m = dec_mul(m_sgn, src_num, src_sgn, src_num, src_sgn),
-         n = c,
-         d = p;
-    auto frac = dec_comp(src_den, d) != NEUNET_DEC_CMP_EQL;
-    if (frac) n = dec_mul(src_den, src_den);
-    else v = c;
+/* General trigonometry series
+ * num_term sine - src_num, cosine - 1
+ * den_term sine - src_den, cosine - 0
+ * fra_form sine - 1      , cosine - 0
+ */
+net_decimal_data dec_series_sin_cos(bool &ans_sgn, const net_decimal_data &src_num, const net_decimal_data &src_den, bool src_sgn, uint64_t prec, net_decimal_data &num_term, net_decimal_data &den_term, net_decimal_data &fra_form) {
+    auto sers_sgn = false;
+    auto one_form = dec_init(ans_sgn, 1);
+    if (dec_is_zero(den_term)) den_term = one_form;
+    auto num_form = dec_mul(src_num, src_num),
+         den_form = dec_mul(src_den, src_den),
+         fra_term = one_form,
+         num      = num_term,
+         den      = den_term,
+         tmp      = dec_init(ans_sgn, 0);
+    auto prec_seg = prec / NEUNET_DEC_DIG_MAX,
+         prec_rem = prec % NEUNET_DEC_DIG_MAX;
+    if (dec_is_zero(den_form)) den_form = one_form;
+    ans_sgn = src_sgn;
     do {
-        auto t_sgn = false;
-        auto t     = dec_mul(t_sgn, c, c_sgn, u, u_sgn);
-        if (dec_comp(q, v) == NEUNET_DEC_CMP_EQL) p = dec_add(p_sgn, p, p_sgn, t, t_sgn);
-        else {
-            p = dec_mul(p_sgn, v, false, p, p_sgn);
-            t = dec_mul(t_sgn, t, t_sgn, q, false);
-            p = dec_add(p_sgn, p, p_sgn, t, t_sgn);
-            q = dec_mul(q, v);
-        }
-        u = dec_mul(u_sgn, u, u_sgn, m, m_sgn);
-        if (frac) v = dec_mul(v, n);
+        sers_sgn = !sers_sgn;
+        num_term = dec_mul(num_term, num_form);
+        den_term = dec_mul(den_term, den_form);
         for (auto i = 0; i < 2; ++i) {
-            b = dec_add(b, c);
-            v = dec_mul(v, b);
+            fra_form = dec_add(fra_form, one_form);
+            fra_term = dec_mul(fra_term, fra_form);
         }
-        c_sgn = !c_sgn;
-        d = dec_e10_lsh(u, prec + 2);
-    } while (dec_comp(d, v) == NEUNET_DEC_CMP_GTR);
-    return dec_div(ans_sgn, p, p_sgn, q, false, prec);
+        tmp = dec_mul(fra_term, den_term);
+        num = dec_add(ans_sgn, dec_mul(num, tmp), ans_sgn, dec_mul(num_term, den), sers_sgn != src_sgn);
+        den = dec_mul(den, tmp);
+    } while (dec_series_check(num_term, tmp, prec));
+    return dec_div(ans_sgn, num, ans_sgn, den, false, prec);
 }
 
 NEUNET_END
