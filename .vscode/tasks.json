@@ -23,45 +23,6 @@
                 "$msCompile"
             ],
             "group": "build"
-        }// ,
-        // {
-        //     "type": "cppbuild",
-        //     "label": "DEBUG build from coretest",
-        //     "command": "cl.exe",
-        //     "args": [
-        //         "/JMC",
-        //         "/Gd",
-        //         "/Od",
-        //         "/WX",
-        //         "/RTCu",
-        //         "/GR",
-        //         "/ZI",
-        //         "/EHsc",
-        //         "/std:c++20",
-        //         "/openmp",
-        //         "/MDd",
-        //         "/Fe${fileDirname}\\${fileBasenameNoExtension}.exe",
-        //         "*.cpp",
-        //         "${file}"
-        //     ],
-        //     "options": {
-        //         "cwd": "${fileDirname}"
-        //     },
-        //     "problemMatcher": [
-        //         "$msCompile"
-        //     ],
-        //     "group": {
-        //         "kind": "build",
-        //         "isDefault": true
-        //     },
-        //     "dependsOn":["clean"],
-        //     "detail": "debug"
-        // },
-        // {
-        //     "type": "shell",
-        //     "label": "clean",
-        //     "command":["git"],
-        //     "args": ["clean", "-Xnf"]
-        // },
+        }
     ]
 }

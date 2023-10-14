@@ -20,8 +20,11 @@
 #define lf_ptr          long double *
 
 #define arr_t_v(t, v)   t[sizeof(v) / sizeof(t)] 
-#define number_cplx_vld std::is_same_v<arg, std::complex<long double>>
-#define number_arg      = std::enable_if_t<std::is_floating_point_v<arg> || std::is_integral_v<arg> || number_cplx_vld>
+#define number_cplx_vld std::is_same_v<std::remove_reference_t<arg>,\
+                        std::complex<long double>>
+#define number_arg      = std::enable_if_t<std::is_arithmetic_v<\
+                          std::remove_reference_t<arg>> ||\
+                          number_cplx_vld>
 
 std::default_random_engine lib_rand_e;
 

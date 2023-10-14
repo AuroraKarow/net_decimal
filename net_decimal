@@ -12,7 +12,6 @@
 
 #define NEUNET_DEC_PI       3.1415926535897932
 
-#define NEUNET_DEC_SEG_MAX  0x8ac7230489e80000
 #define NEUNET_DEC_DIG_MAX  0x0013
 #define NEUNET_DEC_VLD_DIG  0x0010
 
@@ -22,10 +21,53 @@
 
 #define callback_dec_arg    template <typename arg, typename number_arg>
 
+#define number_ins          = std::enable_if_t<\
+                              std::is_same_v<ins,\
+                              neunet::net_decimal_base> ||\
+                              std::is_same_v<ins,\
+                              neunet::net_decimal_frac>>
+#define callback_dec_ins    template <typename ins, typename number_ins>
+
+#define dec_ref(t)          std::is_same_v<neunet::net_decimal,\
+                            std::remove_reference_t<t>>
+
+#define dec_num(v)          std::is_arithmetic_v<\
+                            std::remove_reference_t<v>>
+
+#define dec_ref_t(t)        = std::enable_if_t<dec_ref(t) ||\
+                              dec_num(t)>
+
+#define callback_dec        template<typename dec_t,\
+                                     typename dec_ref_t(dec_t)>
+
+#define dec_ref_t_s(f, s)   = std::enable_if_t<(dec_ref(f) ||\
+                                               dec_num(f)) &&\
+                                               (dec_num(s) ||\
+                                               dec_ref(s))>
+
+#define callback_dec_s      template<typename fst_dec_t,\
+                                     typename snd_dec_t,\
+                                     typename dec_ref_t_s(fst_dec_t,\
+                                                          snd_dec_t)>
+
+#define dec_num_if(t)       if constexpr (dec_num(t)) {
+#define dec_num_elif(t)     } else if constexpr (dec_num(t)) {
+#define dec_num_else        } else {
+#define dec_num_endif       }
+
 #include "net_decimal.hpp"
 
-neunet::net_decimal operator "" _d(const char *src) { return neunet::net_decimal(src); }
+NEUNET_BEGIN
+
+std::atomic_bool net_decimal_base::base_fft = false,
+                 net_decimal::fft_mode      = false;
+
+std::atomic_uint64_t net_decimal_base::base_acc = 32,
+                     net_decimal::accuracy      = 32;
+
+NEUNET_END
+
+neunet::net_decimal operator "" _d(const char *src) { return neunet::net_decimal(std::string(src)); }
 neunet::net_decimal operator "" _d(long double src) { return neunet::net_decimal(src); }
-neunet::net_decimal operator "" _d(uint64_t src) { return neunet::net_decimal(src); }
 
 #endif
