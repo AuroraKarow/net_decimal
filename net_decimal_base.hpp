@@ -295,7 +295,7 @@ void dec_bit_not(net_decimal_data &src, bool comple = false, uint64_t bit = 0, b
 }
 
 /**
- * @brief Binary not
+ * @brief Binary and
  * @param fst   [In]    first source
  * @param snd   [In]    second source
  * @param sgn1  [In]    first source sign
@@ -336,7 +336,7 @@ net_decimal_data dec_bit_and(const net_decimal_data &fst, const net_decimal_data
 }
 
 /**
- * @brief Binary not
+ * @brief Binary or
  * @param fst   [In]    first source
  * @param snd   [In]    second source
  * @param sgn1  [In]    first source sign
@@ -379,7 +379,7 @@ net_decimal_data dec_bit_or(const net_decimal_data &fst, const net_decimal_data 
 }
 
 /**
- * @brief Binary not
+ * @brief Binary xor
  * @param fst   [In]    first source
  * @param snd   [In]    second source
  * @param sgn1  [In]    first source sign

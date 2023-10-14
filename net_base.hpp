@@ -121,7 +121,7 @@ callback_arg bool ptr_sort(arg *&seq_val, uint64_t begin, uint64_t end, bool asc
         auto pivot = begin,
              slide = end;
         while (slide != pivot)
-            if (pivot<slide) {
+            if (pivot < slide) {
                 if ((asc  && seq_val[slide] < seq_val[pivot]) ||
                     (!asc && seq_val[slide] > seq_val[pivot])) {
                     std::swap(seq_val[slide], seq_val[pivot]);
