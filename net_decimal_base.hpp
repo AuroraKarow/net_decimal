@@ -1,5 +1,11 @@
 NEUNET_BEGIN
 
+int dec_comp(const net_decimal_data &fst, bool fst_sgn, const net_decimal_data &snd, bool snd_sgn) {
+    if (fst_sgn == snd_sgn) return dec_comp(fst_sgn, dec_comp(fst, snd));
+    if (fst_sgn) return NEUNET_DEC_CMP_LES;
+    return NEUNET_DEC_CMP_GTR;
+}
+
 net_decimal_data dec_add(bool &ans_sgn, const net_decimal_data &fst, bool fst_sgn, const net_decimal_data &snd, bool snd_sgn) {
     if (dec_is_zero(fst)) {
         ans_sgn = snd_sgn;
@@ -36,20 +42,7 @@ net_decimal_data dec_sub(bool &ans_sgn, const net_decimal_data &minu, bool minu_
         return subt;
     }
     ans_sgn = false;
-    if (minu_sgn == subt_sgn) {
-        auto cmp_res = dec_comp(minu, subt);
-        if (cmp_res == NEUNET_DEC_CMP_GTR) {
-            if (minu_sgn) ans_sgn = true;
-            return dec_add(minu, subt, true);
-        }
-        if (cmp_res == NEUNET_DEC_CMP_LES) {
-            if (!minu_sgn) ans_sgn = true;
-            return dec_add(subt, minu, true);
-        }
-        return {};
-    }
-    if (minu_sgn) ans_sgn = true;
-    return dec_add(minu, subt);
+    return dec_add(ans_sgn, minu, minu_sgn, subt, !subt_sgn);
 }
 
 net_decimal_data dec_mul(bool &ans_sgn, const net_decimal_data &fst, bool fst_sgn, const net_decimal_data &snd, bool snd_sgn) {
@@ -427,7 +420,7 @@ public:
             }
             s = dec_mul(s, o);
             b = dec_add(b, c);
-            d = dec_e10(s, precision + 2);
+            d = dec_e10_lsh(s, precision + 2);
         } while (dec_comp(d, b) == NEUNET_DEC_CMP_GTR);
         a = dec_mul(c, dec_div(p, q, prec));
         return a;
@@ -531,7 +524,7 @@ net_decimal_data dec_ln_2(bool &ans_sgn, const net_decimal_data &src, uint64_t p
         x = dec_mul(x_sgn, x, x_sgn, o, o_sgn);
         b = dec_add(b, i);
         c_sgn = !c_sgn;
-        d = dec_e10(x, prec + 2);
+        d = dec_e10_lsh(x, prec + 2);
     } while (dec_comp(d, b) == NEUNET_DEC_CMP_GTR);
     return dec_div(ans_sgn, p, p_sgn, q, false, prec);
 }
@@ -580,7 +573,7 @@ net_decimal_data dec_exp(bool &ans_sgn, const net_decimal_data &src_num, const n
         u = dec_mul(u_sgn, u, u_sgn, src_num, src_sgn);
         if (s_dec) v = dec_mul(v, c);
         else v = dec_mul(v, dec_mul(c, src_den));
-        d = dec_e10(u, prec + 2);
+        d = dec_e10_lsh(u, prec + 2);
     } while (dec_comp(d, v) == NEUNET_DEC_CMP_GTR);
     return dec_div(ans_sgn, p, p_sgn, q, false, prec);
 }
@@ -616,11 +609,109 @@ net_decimal_data dec_sin_cos(bool &ans_sgn, const net_decimal_data &src_num, con
             v = dec_mul(v, b);
         }
         c_sgn = !c_sgn;
-        d = dec_e10(u, prec + 2);
+        d = dec_e10_lsh(u, prec + 2);
     } while (dec_comp(d, v) == NEUNET_DEC_CMP_GTR);
     return dec_div(ans_sgn, p, p_sgn, q, false, prec);
 }
 
+bool dec_frac_verify(const net_decimal_data &den) { return !dec_is_zero(den); }
 
+bool dec_frac_is_zero(const net_decimal_data &num, const net_decimal_data &den) { return dec_is_zero(den) && dec_is_zero(num); }
+
+bool dec_frac_is_one(const net_decimal_data &num, const net_decimal_data &den) { return dec_is_zero(den) && dec_is_one(num); }
+
+bool dec_frac_is_int(net_decimal_data &num, net_decimal_data &den) {
+    if (!dec_frac_verify(den)) return dec_is_int(num);
+    if (dec_comp(num, den) == NEUNET_DEC_CMP_LES) return false;
+    auto quot = dec_div(num, den, 1);
+    if (quot.ft.length) return false;
+    den.reset();
+    num.ft.reset();
+    num.it = std::move(quot.it);
+    return true;
+}
+
+long double dec_frac2f(bool sgn, net_decimal_data &num, net_decimal_data &den) { return dec2f(sgn, dec_div(num, den, 2)); }
+
+int64_t dec_frac2i(bool sgn, net_decimal_data &num, net_decimal_data &den) {
+    if (dec_is_zero(den)) return dec2i(sgn, num);
+    return dec_frac2f(sgn, num, den);
+}
+
+int dec_frac_comp(const net_decimal_data &fst_num, const net_decimal_data &fst_den, bool fst_sgn, const net_decimal_data &snd_num, const net_decimal_data &snd_den, bool snd_sgn) {
+    if (dec_comp(fst_den, snd_den) == NEUNET_DEC_CMP_EQL) return dec_comp(fst_num, fst_sgn, snd_num, snd_sgn);
+    auto fst_is_frac = dec_frac_verify(fst_den),
+         snd_is_frac = dec_frac_verify(snd_den);
+    if (fst_is_frac && snd_is_frac) return dec_comp(dec_mul(fst_num, snd_den), fst_sgn, dec_mul(snd_num, fst_den), snd_sgn);
+    if (fst_is_frac) return dec_comp(fst_num, fst_sgn, dec_mul(snd_num, fst_den), snd_sgn);
+    return dec_comp(dec_mul(fst_num, snd_den), fst_sgn, snd_num, snd_sgn);
+}
+
+bool dec_frac_add(net_decimal_data &fst_num, net_decimal_data &fst_den, bool fst_sgn, const net_decimal_data &snd_num, const net_decimal_data &snd_den, bool snd_sgn) {
+    if (dec_frac_is_zero(fst_den, fst_den)) {
+        fst_num = snd_num;
+        fst_den = snd_den;
+        return snd_sgn;
+    }
+    if (dec_frac_is_zero(snd_den, snd_den)) return fst_sgn;
+    auto ans_sgn = false;
+    if (dec_comp(fst_den, snd_den) == NEUNET_DEC_CMP_EQL) {
+        fst_num = dec_add(ans_sgn, fst_num, fst_sgn, snd_num, snd_sgn);
+        return ans_sgn;
+    }
+    auto fst_is_frac = dec_frac_verify(fst_den),
+         snd_is_frac = dec_frac_verify(snd_den);
+    if (fst_is_frac && snd_is_frac) {
+        fst_num = dec_add(ans_sgn, dec_mul(fst_num, snd_den), fst_sgn, dec_mul(snd_num, fst_den), snd_sgn);
+        fst_den = dec_mul(fst_den, snd_den);
+        return ans_sgn;
+    }
+    if (fst_is_frac) {
+        fst_num = dec_add(ans_sgn, fst_num, fst_sgn, dec_mul(snd_num, fst_den), snd_sgn);
+        return ans_sgn;
+    }
+    fst_num = dec_add(ans_sgn, dec_mul(fst_num, snd_den), fst_sgn, snd_num, snd_sgn);
+    fst_den = snd_den;
+    return ans_sgn;
+}
+
+bool dec_frac_sub(net_decimal_data &minu_num, net_decimal_data &minu_den, bool minu_sgn, const net_decimal_data &subt_num, const net_decimal_data &subt_den, bool subt_sgn) {
+    if (dec_frac_is_zero(subt_num, subt_den)) return minu_sgn;
+    if (dec_frac_is_zero(minu_num, minu_den)) {
+        minu_num = subt_num;
+        minu_den = subt_den;
+        return !subt_sgn;
+    }
+    return dec_frac_add(minu_num, minu_den, minu_sgn, subt_num, subt_den, !subt_sgn);
+}
+
+bool dec_frac_mul(net_decimal_data &fst_num, net_decimal_data &fst_den, bool fst_sgn, const net_decimal_data &snd_num, const net_decimal_data &snd_den, bool snd_sgn) {
+    auto ans_sgn = fst_sgn != snd_sgn;
+    if (dec_frac_is_one(snd_num, snd_den)) return ans_sgn;
+    if (dec_frac_is_one(fst_num, fst_den)) {
+        fst_num = snd_num;
+        fst_den = snd_den;
+        return ans_sgn;
+    }
+    auto fst_is_frac = dec_frac_verify(fst_den),
+         snd_is_frac = dec_frac_verify(snd_den);
+    fst_num          = dec_mul(fst_num, snd_num);
+    if (fst_is_frac && snd_is_frac) {
+        fst_den = dec_mul(fst_den, snd_den);
+        return ans_sgn;
+    }
+    if (snd_is_frac) fst_den = snd_den;
+    return ans_sgn;
+}
+
+bool dec_frac_div(net_decimal_data &divd_num, net_decimal_data &divd_den, bool divd_sgn, const net_decimal_data &divr_num, const net_decimal_data &divr_den, bool divr_sgn) { return dec_frac_mul(divd_num, divd_den, divd_sgn, divr_den, divr_num, divr_sgn); }
+
+void dec_frac0(net_decimal_data &num, net_decimal_data &den) { if (dec_is_zero(num)) den.reset(); }
+
+void dec_frac1(net_decimal_data &num, net_decimal_data &den) { if (dec_comp(num, den) == NEUNET_DEC_CMP_EQL) {
+    den.reset();
+    num.reset();
+    num.it = {1};
+} }
 
 NEUNET_END

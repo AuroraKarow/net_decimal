@@ -1,15 +1,5 @@
 NEUNET_BEGIN
 
-callback_args static void net_print(arg &&para, args &&...paras) {
-    std::cout << para;
-    if constexpr (sizeof...(args) > 0) net_print(paras...);
-}
-
-void net_assert(bool expression, const char *ty_name_space, const char *fn_name, const char *msg) { if (!expression) {
-    std::cerr << '[' << ty_name_space << "::" << fn_name << "][" << msg << ']' << std::endl;
-    std::abort();
-}}
-
 /* Pointer */
 
 callback_arg arg *ptr_init(uint64_t len) {
@@ -367,10 +357,7 @@ uint64_t num_cnt(uint64_t first, uint64_t second, uint64_t dilate = 0) {
 }
 
 long double num_rate(long double numerator, long double denominator) {
-    net_assert(denominator,
-               "neunet",
-               "num_rate",
-               "Denominator could not equal to 0.");
+    if (!denominator) return neunet_null_ref(long double);
     return numerator / denominator;
 }
 
@@ -419,36 +406,20 @@ long long num_bit_inverse(long long src, uint8_t bit_cnt = 3) {
 
 uint64_t num_bit_cnt(long long src) { return std::log2(src) + 1; }
 
-long double num_rand(long double fst_rng = 0, long double snd_rng = 0, uint64_t acc = 8) {
-    if (fst_rng == snd_rng) return (((long double)lib_rand_e() / (long double)lib_rand_e._Max) - .5l) * 2.0l;
-    else {
-        // random seed
-        auto curr_time = std::chrono::time_point_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now()).time_since_epoch().count();
-        curr_time /= 100;
-        // interval
-        if (fst_rng > snd_rng) std::swap(fst_rng, snd_rng);
-        long double ans   = 0;
-        auto        times = 1ull;
-        for (auto i = 0ull; i < acc || ans < snd_rng; ++i) {
-            ans       *= 10;
-            ans       += curr_time % 10;
-            curr_time /= 10;
-            times     *= 10;
-        }
-        // rectify
-        auto rng = snd_rng - fst_rng;
-        ans /= times / rng;
-        ans += fst_rng;
-        return ans;
-    }
+long double num_rand(long double fst_rng, long double snd_rng) {
+    NEUNET_SRAND
+    if (fst_rng == snd_rng) return fst_rng;
+    if (snd_rng < fst_rng) std::swap(fst_rng, snd_rng);
+    auto rng_dif = snd_rng - fst_rng;
+    return (rng_dif / RAND_MAX) * std::rand() + fst_rng;
 }
 
-callback_arg arg *num_rand(uint64_t amt, arg fst_rng, arg snd_rng, bool order = true, uint64_t acc = 8) {
+callback_arg arg *num_rand(uint64_t amt, arg fst_rng, arg snd_rng, bool order) {
     if (amt == 0) return nullptr;
     auto ans = ptr_init<arg>(amt);
     auto cnt = 0;
     while (cnt < amt) {
-        arg temp = num_rand(fst_rng, snd_rng, acc);
+        arg temp = num_rand(fst_rng, snd_rng);
         for (auto i = 0ull; i < cnt; ++i) if (temp == *(ans + i)) continue;
         *(ans + cnt++) = temp;
     }
@@ -546,18 +517,6 @@ template <typename ... arg> ch_str str_cat(const ch_str fst, const ch_str snd, a
     auto curr_ans = str_cat(fst, snd);
     auto ans      = str_cat(curr_ans, src ...);
     ptr_reset(curr_ans);
-    return ans;
-}
-
-std::string str_construct(ch_str &&src) {
-    std::string ans = src;
-    ptr_reset(src);
-    return ans;
-}
-
-ch_str str_init(uint64_t len) {
-    auto ans = ptr_init<char>(len + 1);
-    ans[len] = '\0';
     return ans;
 }
 

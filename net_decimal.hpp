@@ -102,15 +102,15 @@ public:
     }
 
     int64_t to_integer() const {
-        if (is_dec()) return dec_to_integer(sgn, num);
+        if (is_dec()) return dec2i(sgn, num);
         net_decimal_data ans_num = num;
         ans_num = dec_rem(ans_num, den);
-        return dec_to_integer(sgn, ans_num);
+        return dec2i(sgn, ans_num);
     }
 
     long double to_float() const {
-        if (is_dec()) return dec_to_float(sgn, num);
-        return dec_to_float(sgn, dec_div(num, den, NEUNET_DEC_VLD_DIG - 2));
+        if (is_dec()) return dec2f(sgn, num);
+        return dec2f(sgn, dec_div(num, den, NEUNET_DEC_VLD_DIG - 2));
     }
 
     net_decimal float_part(net_decimal &integer_part) const {
@@ -129,7 +129,6 @@ public:
     }
 
     net_decimal remainder(net_decimal &divr) {
-        net_assert(is_integer() && divr.is_integer(), "net_decimal", "remiander", "Parameters should be integer.");
         net_decimal ans = *this;
         dec_rem(ans.num, divr.num);
         if (divr.modulus_mode && sgn != divr.sgn) ans.num = dec_add(ans.sgn, ans.num, ans.sgn, divr.num, divr.sgn);
@@ -138,8 +137,6 @@ public:
 
     callback_dec_arg static void remainder(arg &divd, net_decimal &divr) {
         static_assert(std::is_integral_v<arg>, "Dividend should be an integer.");
-        net_assert(divr.is_integer(), "net_decimal", "(int64_t)%=", "Divisior should be an integer.");
-        net_assert(divr.num.it.length == 1 && ((divr.sgn && divr.num.it[0] < LLONG_MAX) || !divr.sgn), "net_decimal", "(int64_t)%=", "Divisior digit count is greater than significant figure of built-in arithmetric type.");
         auto divr_arith = divr.to_integer();
         auto divd_sgn   = divd < 0;
         divd = divd % divr_arith;

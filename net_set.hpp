@@ -223,10 +223,7 @@ public:
     void reset() { len = 0; ptr_reset(ptr); }
     
     arg &operator[](uint64_t idx) const {
-        net_assert(idx < len,
-                   "net_set",
-                   "[]",
-                   "Index should be less than set length.");
+        if (idx >= len) return neunet_null_ref(arg);
         return *(ptr + idx);
     }
 

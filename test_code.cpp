@@ -7,6 +7,8 @@
 #include <iostream>
 #include "net_decimal"
 
+#define neunet_arr_len(type, src) sizeof(src) / sizeof(type)
+
 #define NEUNET_CHRONO_TIME_POINT    std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now()).time_since_epoch().count()
 
 using std::cout;
@@ -70,255 +72,455 @@ long double pi_iter() {
 //     return 2 * n;
 // }
 
-// true - divdend >= next dividend; false - dividend < next divdend
-bool dec_div_ge(uint64_t divd_high, const net_set<uint64_t> &divd, uint64_t divd_tmp_carry, uint64_t divd_high_tmp, const net_set<uint64_t> &divd_tmp) {
-    if (divd_high > divd_tmp_carry) return true;
-    if (divd_high < divd_tmp_carry) return false;
-    if (divd[0] > divd_high_tmp) return true;
-    if (divd[0] < divd_high_tmp) return false;
-    for (auto i = 1ull; i < divd.length; ++i) {
-        auto divd_tmp_coe = divd_tmp[i - 1];
-        if (divd[i] > divd_tmp_coe) return true;
-        if (divd[i] < divd_tmp_coe) return false;
+// return carry
+uint64_t dec_lsh64(uint64_t &src, uint64_t bit) {
+    uint64_t carry = src;
+    if (bit == 0x0040) src = 0;
+    else {
+        carry >>= (0x0040 - bit);
+        src     = uint64_t(src << bit);
     }
-    if (divd_tmp[divd_tmp.length - 1]) return false;
-    return true;
+    auto tmp = carry;
+    auto sgn = false;
+    carry  <<= 1;
+    src      = dec_sub(sgn, src, dec_mul(tmp, tmp, 0x158e460913d00000));
+    carry   -= tmp;
+    if (sgn) --carry;
+    return carry;
 }
-uint64_t dec_div_carry(uint64_t &carry, uint64_t divd, uint64_t divr, uint64_t ans_coe) {
-    auto aca = false;
-    auto tmp = carry,
-         ans = dec_add(aca, dec_mul(carry, ans_coe, divr), tmp);
-    if (aca) ++carry;
-    aca = false;
-    ans = dec_sub(aca, divd, ans);
-    if (aca) ++carry;
+void dec_lsh64(net_decimal_data &src, uint64_t bit) {
+    net_decimal_data carry;
+    carry.it.init(src.it.length << 1);
+    auto sub_idx = 0ull;
+    for (auto i = 0ull; i < src.it.length; ++i) {
+        auto carry_tmp = dec_lsh64(src.it[i], bit);
+        if (!carry_tmp) continue;
+        sub_idx            = i + 1;
+        carry.it[sub_idx] += carry_tmp % NEUNET_DEC_SEG_MAX;
+        carry_tmp         /= NEUNET_DEC_SEG_MAX;
+        if (carry_tmp) carry.it[++sub_idx] += carry_tmp;
+    }
+    if (sub_idx) carry.it = carry.it.sub_set(0, sub_idx);
+    src = dec_add(carry, src);
+}
+
+void dec_lsh(net_decimal_data &src, uint64_t bit) {
+    if (!(dec_is_int(src) && bit)) return;
+    auto bit_cnt = bit >> 6;
+    for (auto i = 0ull; i < bit_cnt; ++i) dec_lsh64(src, 0x0040);
+    bit_cnt <<= 6;
+    bit_cnt   = bit - bit_cnt;
+    if (bit_cnt) dec_lsh64(src, bit_cnt);
+}
+
+// return remainder
+net_decimal_data dec_rsh64(uint64_t &src, uint64_t bit, uint64_t src_idx, bool last) {
+    auto rem_tmp = src;
+    if(bit == 0x0040) src = 0;
+    else {
+        src   >>= bit;
+        rem_tmp = (uint64_t)(rem_tmp << (0x0040 - bit));
+    }
+    net_decimal_data rem;
+    if (last) {
+        rem.ft.init(1);
+        rem.ft[0] = rem_tmp;
+        return rem;
+    }
+    if (src_idx == 1) {
+        rem.it.init(1);
+        rem.it[0] = rem_tmp;
+        return rem;
+    }
+    rem.it.init(src_idx);
+    rem.it[--src_idx] = rem_tmp;
+    return rem;
+}
+void dec_rsh64(net_decimal_data &src, uint64_t bit) {
+    net_decimal_data rem;
+    auto src_len = src.it.length;
+    for (auto i = src_len; i; --i) {
+        auto idx_tmp = i - 1,
+             src_tmp = src.it[idx_tmp];
+        rem = dec_add(rem, dec_rsh64(src_tmp, bit, idx_tmp, i == 1));
+        if (!src_tmp && src_len == i) --src_len;
+        src.it[idx_tmp] = src_tmp;
+    }
+    auto sgn = false;
+    auto b64 = dec_init(sgn, "0.542101086242752217003726400434970855712890625");
+    rem      = dec_mul(rem, b64);
+    if (bit == 0x0040) {
+        src = std::move(rem);
+        return;
+    }
+    if (src_len < src.it.length) src.it = src.it.sub_set(0, src_len - 1);
+    src = dec_add(rem, src);
+}
+
+void dec_rsh(net_decimal_data &src, uint64_t bit) {
+    if (!(dec_is_int(src) && bit)) return;
+    auto bit_cnt = bit >> 6;
+    for (auto i = 0ull; i < bit_cnt; ++i) dec_rsh64(src, 0x0040);
+    bit_cnt <<= 6;
+    bit_cnt   = bit - bit_cnt;
+    if (bit_cnt) dec_rsh64(src, bit_cnt);
+}
+
+/* obsolete division */ // TODO: DIVISION
+
+callback_dec_arg uint8_t dec_carry(int64_t &carry, const arg &coe) {
+    auto tmp = carry + coe;
+    carry    = 0;
+    if (tmp < 0) while (tmp < 0) {
+        tmp += 10;
+        --carry;
+    } else {
+        carry = tmp / 10;
+        tmp  %= 10;
+    }
+    return tmp;
+}
+
+void dec_coe_seg(net_set<uint64_t> &ans_coe, bool is_it, uint64_t &ans_idx, uint64_t &pow_cnt, uint64_t &seg_tmp) { if (pow_cnt == NEUNET_DEC_SEG_MAX) {
+    if (is_it) ans_coe[ans_idx++] = seg_tmp;
+    else ans_coe[--ans_idx] = seg_tmp;
+    seg_tmp = 0;
+    pow_cnt = 1;
+} }
+
+callback_dec_arg void dec_coe(net_set<arg> &dest, uint64_t &idx, const net_set<uint64_t> &seg_set, bool is_it) { for (auto i = is_it ? 0 : seg_set.length; is_it ? (i < seg_set.length) : i; is_it ? ++i : --i) {
+    uint64_t seg_tmp = seg_set[is_it ? i : (i - 1)],
+             seg_dig = NEUNET_DEC_DIG_MAX;
+    if (i == seg_set.length) while (!(seg_tmp % 10)) {
+        --seg_dig;
+        seg_tmp /= 10;
+    }
+    while (seg_dig) {
+        if (is_it && (i + 1) == seg_set.length && !seg_tmp) break;
+        arg dig_tmp = 0;
+        if (seg_tmp) {
+            dig_tmp  = seg_tmp % 10;
+            seg_tmp /= 10;
+        }
+        dest[--idx] = dig_tmp;
+        --seg_dig;
+    }
+} }
+// from high digit
+callback_dec_arg void dec_coe(net_set<arg> &dest, const net_decimal_data &src) {
+    auto idx = dest.length;
+    dec_coe(dest, idx, src.ft, false);
+    dec_coe(dest, idx, src.it, true);
+}
+// coefficient ordering from high digit
+callback_dec_arg net_decimal_data dec_coe(const net_set<arg> &src, uint64_t ft_cnt) {
+    auto idx_tmp = src.length;
+    auto carry   = 0ll;
+    while (ft_cnt && !src[idx_tmp - 1]) {
+        --ft_cnt;
+        --idx_tmp;
+    }
+    net_set<uint64_t> ans_coe(src.length);
+    auto dig_cnt = ft_cnt % NEUNET_DEC_DIG_MAX,
+         pow_cnt = NEUNET_DEC_SEG_MAX,
+         seg_tmp = 0ull,
+         ans_idx = ans_coe.length;
+    if (dig_cnt) for (auto i = 0; i < dig_cnt; ++i) pow_cnt /= 10;
+    else if (ft_cnt) pow_cnt = 1;
+    for (auto i = 0ull; i < ft_cnt; ++i) {
+        seg_tmp += dec_carry(carry, src[--idx_tmp]) * pow_cnt;
+        pow_cnt *= 10;
+        dec_coe_seg(ans_coe, false, ans_idx, pow_cnt, seg_tmp);
+    }
+    net_decimal_data ans;
+    if (ft_cnt) ans.ft = ans_coe.sub_set(ans_idx, ans_coe.length - 1);
+    ans_idx = 0;
+    pow_cnt = 1;
+    for (auto i = idx_tmp; i; --i) {
+        seg_tmp += dec_carry(carry, src[i - 1]) * pow_cnt;
+        pow_cnt *= 10;
+        dec_coe_seg(ans_coe, true, ans_idx, pow_cnt, seg_tmp);
+    }
+    while (carry) {
+        seg_tmp += carry % 10 * pow_cnt;
+        pow_cnt *= 10;
+        carry   /= 10;
+        dec_coe_seg(ans_coe, true, ans_idx, pow_cnt, seg_tmp);
+    }
+    if (seg_tmp) ans_coe[ans_idx++] = seg_tmp;
+    else while (ans_idx && !ans_coe[ans_idx - 1]) --ans_idx;
+    ans.it = ans_coe.sub_set(0, ans_idx - 1);
     return ans;
 }
-uint64_t dec_div(uint64_t divd_0, uint64_t divd_1, uint64_t divr) {
-    /*
-    4316845796773021554|0000000000000000000
-                      / 9632515584713416829
-                      = 4481535232212608781
-    precision lost -> 4316845796773021554 / 0.9632515584713416829 + 0
-                      = 4481535232212609024
-                      * 9632515584713416829
-    4316845796773021787|9395928199718864896
-    or return 4481535232212609024
-    */
-    auto     divr_d = divr / 1e19;
-    uint64_t ans_0  = divd_0 / divr_d + divd_1 * 1. / divr,
-             divd_2 = 0,
-             divd_3 = dec_mul(divd_2, divr, ans_0);
-    if (divd_0 == divd_2 && divd_1 == divd_3) return ans_0;
-    /*
-    compare = 4316845796773021554|0000000000000000000 > 4316845796773021787|9395928199718864896
-    true  4316845796773021554|0000000000000000000 - 4316845796773021787|9395928199718864896
-    false 4316845796773021787|9395928199718864896 - 4316845796773021554|0000000000000000000
-    = 233|9395928199718864896
-    */
-    auto cmp = divd_0 > divd_2 || (divd_0 == divd_2 && divd_1 > divd_3),
-         tmp = false;
-    if (cmp) {
-        divd_3 = dec_sub(tmp, divd_1, divd_3);
-        divd_2 = divd_0 - divd_2;
-    } else {
-        divd_3  = dec_sub(tmp, divd_3, divd_1);
-        divd_2 -= divd_0;
-    }
-    if (tmp) --divd_2;
-    /*
-    242 = 233 / 0.9632515584713416829 + 9395928199718864896 / 9632515584713416829
-    compare ->
-    true  4481535232212609024 + 242
-    truncating for rounding down
-    -> false 4481535232212609024 - (242 + 1)
-    Rounding up
-    return 4481535232212608781
-    */
-    uint64_t ans_1 = divd_2 / divr_d + divd_3 * 1. / divr;
-    if (cmp) return ans_0 + ans_1;
-    return ans_0 - ans_1;
-}
-uint64_t dec_div(net_set<uint64_t> &divd, const net_set<uint64_t> &divr, uint64_t &divd_high) {
-    net_set<uint64_t> divd_tmp;
+uint8_t dec_div_obsolete(net_set<uint8_t> &divd, const net_set<uint8_t> &divr) {
+    net_set<uint8_t> divd_tmp;
     if (divd.length > divr.length) {
         divd_tmp.init(divd.length - 1);
         for (auto i = 0ull; i < divr.length; ++i) {
-            if (divd[i] > divr[i]) break;
             if (divd[i] < divr[i]) {
-                if (divd_high && !i) break;
-                divd_high = divd[0];
-                divd_tmp.copy(0, divd, 1, divd_tmp.length);
+                divd_tmp[0] = divd[0] * 10 + divd[1];
+                divd_tmp.copy(1, divd, 2, divd_tmp.length - 1);
                 divd = std::move(divd_tmp);
                 return 0;
             }
+            if (divd[i] > divr[i]) break;
         }
     } else divd_tmp.init(divr.length);
-    auto ans_coe = dec_div(divd_high, divd[0], divr[0]),
-         ans_pow = NEUNET_DEC_SEG_MAX;
-    while (ans_coe < ans_pow) ans_pow /= 10;
-
-    // std::cout << '\n';
-    // if (divd_high) std::cout << dec_to_string_seg(divd_high);
-    // for (auto i = 0ull; i < divd.length; ++i) std::cout << dec_to_string_seg(divd[i]); std::cout << '\n';
-    // std::cout << std::endl;
-    
-    for (auto i = 0ull; ; ++i) {
-        uint64_t carry = 0;
+    auto ans_coe = divd[0] / divr[0];
+    if (ans_coe >= 10) 
+    ans_coe = 9;
+    neunet_dec_loop {
+        auto carry = 0ll;
+        
+        // for (auto i = 0ull; i < divd.length; ++i) std::cout << dec_to_string_coe(divd[i]); std::cout << '\n';
+        // for (auto i = 0ull; i < divr.length; ++i) std::cout << dec_to_string_coe(ans_coe * divr[i]); std::cout << '\n';
+        
         if (divd.length > divr.length) divd_tmp.copy(divr.length - 1, divd, divr.length, divd.length - divr.length);
         for (auto i = divr.length; i > 1; --i) {
             auto idx = i - 1;
-            if (idx < divd.length) divd_tmp[idx - 1] = dec_div_carry(carry, divd[idx], divr[idx], ans_coe);
-            else divd_tmp[idx - 1] = dec_div_carry(carry, 0, divr[idx], 1);
+            if (idx < divd.length) divd_tmp[idx - 1] = dec_carry(carry, divd[idx] - ans_coe * divr[idx]);
+            else divd_tmp[idx - 1] = dec_carry(carry, 0 - ans_coe * divr[idx]);
         }
-        auto tmp = dec_div_carry(carry, divd[0], divr[0], ans_coe);
+        carry += divd[0] - ans_coe * divr[0];
 
-        // if (tmp) std::cout << dec_to_string_seg(tmp);
-        // for (auto i = 0ull; i < divd_tmp.length; ++i) std::cout << dec_to_string_seg(divd_tmp[i]);
-        // std::cout << ans_coe;
-        
-        if (carry <= divd_high) {
-            if (ans_pow == 1 || !i) {
-                divd_high = tmp;
-                break;
-            }
-            ans_coe += ans_pow;
-            ans_pow /= 10;
+        // std::cout << dec_to_string_coe(carry);
+        // for (auto i = 0ull; i < divd_tmp.length; ++i) std::cout << dec_to_string_coe(divd_tmp[i]); std::cout << '\n';
+
+        if (carry >= 0) {
+            divd_tmp[0] += carry * 10;
+            break;
         }
-        
-        // else std::cout << '*';
-        // std::cout << '\n';
 
-        ans_coe -= ans_pow;
+        // else std::cout << int(ans_coe) << std::endl;
+
+        --ans_coe;
     }
     divd = std::move(divd_tmp);
-
-    // std::cout << std::endl;
-
+    
+    // std::cout << int(ans_coe) << '\n' << std::endl;
+    
     return ans_coe;
 }
-net_decimal_data dec_div_test(const net_decimal_data &divd, const net_decimal_data &divr, uint64_t prec) {
-    net_assert(!dec_is_zero(divr), "neunet", "dec_div(net_decimal_data)", "Divisor could not be 0.");
-    uint64_t ans_it_cnt  = 1,
-             ans_idx_tmp = 0,
-             divd_high   = 0;
-    if (divd.it.length < divr.it.length) ans_idx_tmp = divr.it.length - divd.it.length;
-    else ans_it_cnt = divd.it.length - divr.it.length + 1;
-    auto ft_len = prec / NEUNET_DEC_DIG_MAX;
-    if (prec % NEUNET_DEC_DIG_MAX) ++ft_len;
-    net_set<uint64_t> ans_coe(ans_it_cnt + ft_len);
-    auto divd_coe = divd.it,
-         divr_coe = divr.it;
-    divd_coe.reverse();
-    divr_coe.reverse();
-    divd_coe = divd_coe.unit(divd.ft);
-    divr_coe = divr_coe.unit(divr.ft);
-    for (auto i = ans_idx_tmp; i < ans_coe.length; ++i) ans_coe[i] = dec_div(divd_coe, divr_coe, divd_high);
-    net_decimal_data ans;
-    ans_idx_tmp = 0;
-    while (ans_idx_tmp < ans_it_cnt && !ans_coe[ans_idx_tmp]) ++ans_idx_tmp;
-    if (ans_idx_tmp < ans_it_cnt) ans.it = ans_coe.sub_set(ans_idx_tmp, ans_it_cnt - 1);
-    ans.it.reverse();
-    ans_idx_tmp = ans_coe.length;
-    while (ans_idx_tmp > ans_it_cnt && !ans_coe[ans_idx_tmp - 1]) --ans_idx_tmp;
-    if (ans_idx_tmp > ans_it_cnt) ans.ft = ans_coe.sub_set(ans_it_cnt, ans_idx_tmp - 1);
+net_decimal_data dec_div_obsolete(const net_decimal_data &divd, const net_decimal_data &divr, uint64_t prec) {
+    auto divd_ft_cnt = dec_dig_cnt(divd, false),
+         divd_it_cnt = dec_dig_cnt(divd, true),
+         divr_ft_cnt = dec_dig_cnt(divr, false),
+         divr_it_cnt = dec_dig_cnt(divr, true),
+         ans_it_cnt  = 1ull,
+         ans_idx_tmp = 0ull;
+    net_set<uint8_t> divr_coe(divr_it_cnt + divr_ft_cnt),
+                     divd_coe(divd_it_cnt + divd_ft_cnt);
+    dec_coe(divd_coe, divd);
+    dec_coe(divr_coe, divr);
+    if (divd_it_cnt < divr_it_cnt) ans_idx_tmp = divr_it_cnt - divd_it_cnt;
+    else ans_it_cnt = divd_it_cnt - divr_it_cnt + 1;
+    net_set<uint8_t> ans_coe(ans_it_cnt + prec + 2);
+    for (auto i = ans_idx_tmp; i < ans_coe.length; ++i) ans_coe[i] = dec_div_obsolete(divd_coe, divr_coe);
+
+    // std::cout << "ans" << std::endl;
+    // for (int tmp : ans_coe) std::cout << tmp << std::endl;
+
+    return dec_coe(ans_coe, prec + 2);
+}
+
+net_decimal_data dec_rem_obsolete(net_decimal_data &divd_rem, const net_decimal_data &divr) {
+    auto comp_res = dec_comp(divd_rem, divr);
+    auto sgn_tmp  = false;
+    if (comp_res == NEUNET_DEC_CMP_LES) return dec_init(sgn_tmp, 0);
+    if (comp_res == NEUNET_DEC_CMP_EQL) return dec_init(sgn_tmp, 1);
+    auto divd_ft_cnt = dec_dig_cnt(divd_rem, false),
+         divd_it_cnt = dec_dig_cnt(divd_rem, true),
+         divr_ft_cnt = dec_dig_cnt(divr, false),
+         divr_it_cnt = dec_dig_cnt(divr, true);
+    net_set<uint8_t> divr_coe(divr_it_cnt + divr_ft_cnt);
+    net_set<uint8_t> divd_coe(divd_it_cnt + divd_ft_cnt);
+    dec_coe(divd_coe, divd_rem);
+    dec_coe(divr_coe, divr);
+    net_set<uint8_t> ans_coe(divd_it_cnt - divr_it_cnt + 1);
+    auto next = false;
+    for (auto i = 0ull; i < ans_coe.length; ++i) ans_coe[i] = dec_div_obsolete(divd_coe, divr_coe);
+    divd_rem = dec_coe(divd_coe, 1);
+    divd_rem.ft.reset();
+    return dec_coe(ans_coe, 0);
+    return {};
+}
+
+// TODO: Division next of Xian Yida
+
+uint64_t dec_div_divr(const net_decimal_data &divr, uint64_t &lsh_pow, uint64_t &seg_pow, uint64_t &sh_cnt, bool &lsh) {
+    sh_cnt   = 0;
+    auto ans = 0ull,
+         rem = 0ull;
+    auto gtr = true;
+    if (divr.it.length) {        
+        sh_cnt = divr.it.length - 1;
+        if (sh_cnt > 1) rem = divr.it[sh_cnt - 1];
+        else if (divr.ft.length) rem = divr.ft[0];
+        else gtr = false;
+        ans = divr.it[sh_cnt];
+        lsh = false;
+    } else {
+        lsh = true;
+        while (!divr.ft[sh_cnt++]);
+        ans = divr.ft[sh_cnt - 1];
+        if (sh_cnt < divr.ft.length) rem = divr.ft[sh_cnt];
+        else gtr = false;
+    }
+    seg_pow = std::pow(10, int(std::log10(ans)) + 1);
+    lsh_pow = NEUNET_DEC_SEG_MAX / seg_pow;
+    if (lsh_pow > 1) {
+        ans *= lsh_pow;
+        ans += rem / seg_pow;
+    }
+    if (gtr) ++ans;
     return ans;
 }
 
-net_decimal_data dec_e10_mul(const net_decimal_data &src, uint64_t dig_cnt) {
-    auto seg_cnt = dig_cnt / NEUNET_DEC_DIG_MAX,
-         seg_rem = 0ull;
-    net_decimal_data ans;
-    if (seg_cnt) {
-        if (seg_cnt >= src.ft.length) if (seg_cnt == src.ft.length) ans.it = std::move(src.ft);
-        else {
-            ans.it.init(seg_cnt);
-            ans.it.copy(0, src.ft, 0, src.ft.length);
-        } else {
-            ans.ft = src.ft.sub_set(seg_cnt, src.ft.length - 1);
-            ans.it = src.ft.sub_set(0, seg_cnt - 1);
-        }
-        ans.it.reverse();
-        ans.it = ans.it.unit(src.it);
+uint64_t dec_div_divd_ft_idx(const net_decimal_data &divd) {
+    if (divd.it.length) return 0;
+    auto ans = 0ull;
+    while (!divd.ft[ans]) ++ans;
+    return ans;
+}
+
+uint64_t dec_div_quot_idx_init(uint64_t divd_it_len, uint64_t sh_cnt, bool lsh, bool &quot_it) {
+    auto ans = 0ull;
+    if (divd_it_len) {
+        quot_it = true;
+        ans     = divd_it_len;
+    } else {
+        quot_it = false;
+        ans     = 0;
     }
-    dig_cnt %= NEUNET_DEC_DIG_MAX;
-    if (!dig_cnt) return ans;
-    seg_cnt = 1;
-    for (auto i = 0; i < dig_cnt; ++i) seg_cnt *= 10;
-    dig_cnt = NEUNET_DEC_SEG_MAX / seg_cnt;
-    for (auto i = ans.ft.length; i; --i) {
-        auto seg_idx     = i - 1;
-        auto seg_tmp     = ans.ft[seg_idx] / dig_cnt;
-        ans.ft[seg_idx] %= dig_cnt;
-        ans.ft[seg_idx] *= seg_cnt;
-        ans.ft[seg_idx] += seg_rem;
-        seg_rem          = seg_tmp;
-    }
-    if (ans.ft.length) {
-        auto tmp = ans.ft.length;
-        while (tmp && !ans.ft[tmp - 1]) --tmp;
-        if (tmp) ans.ft = ans.ft.sub_set(0, tmp - 1);
-    }
-    for (auto i = 0ull; i < ans.it.length; ++i) {
-        auto seg_tmp = ans.it[i] / dig_cnt;
-        ans.it[i]   %= dig_cnt;
-        ans.it[i]   *= seg_cnt;
-        ans.it[i]   += seg_rem;
-        seg_rem      = seg_tmp;
-    }
-    if (seg_rem) {
-        net_set<uint64_t> it(ans.it.length + 1);
-        it.copy(0, ans.it, 0, ans.it.length);
-        it[ans.it.length] = seg_rem;
-        ans.it = std::move(it);
+    if ((lsh && quot_it) || !(lsh || quot_it)) ans += sh_cnt;
+    else if (ans > sh_cnt) ans -= sh_cnt;
+    else {
+        ans     = sh_cnt - ans;
+        quot_it = !quot_it;
     }
     return ans;
 }
 
-net_decimal_data dec_e10_div(const net_decimal_data &src, uint64_t dig_cnt, bool div = false) {
-    auto seg_cnt = dig_cnt / NEUNET_DEC_DIG_MAX,
-         seg_rem = 0ull;
-    net_decimal_data ans;       
-    if (seg_cnt) {
-        if (seg_cnt >= src.it.length) if (seg_cnt == src.it.length) ans.ft = std::move(src.it);
-        else {
-            ans.ft.init(seg_cnt);
-            ans.ft.copy(0, src.it, 0, src.it.length);
-        } else {
-            ans.it = src.it.sub_set(seg_cnt, src.it.length - 1);
-            ans.ft = src.it.sub_set(0, seg_cnt - 1);
+void dec_div_quot_idx_next(uint64_t sh_cnt, uint64_t &quot_idx, bool &quot_it) {
+    if (quot_it) if (quot_idx > sh_cnt) quot_idx -= sh_cnt;
+    else {
+        quot_it  = false;
+        quot_idx = sh_cnt - quot_idx;
+    } else quot_idx += sh_cnt;
+}
+
+uint64_t dec_div_divd(const net_decimal_data &divd, uint64_t &high, uint64_t lsh_pow, uint64_t seg_pow, uint64_t &it_len, uint64_t &ft_idx, uint64_t divr_seg, uint64_t &quot_idx, bool &quot_it) { neunet_dec_loop {
+    auto ans = 0ull,
+         rem = 0ull;
+    if (it_len) {
+        ans = divd.it[it_len - 1];
+        if (it_len > 1) rem = divd.it[it_len - 2];
+        else if (divd.ft.length) rem = divd.ft[0];
+    } else if (ft_idx < divd.ft.length) {
+        ans             = divd.ft[ft_idx];
+        auto rem_ft_idx = ft_idx + 1;
+        if (rem_ft_idx < divd.ft.length) rem = divd.ft[rem_ft_idx];
+    }
+    auto high_tmp = high * lsh_pow;
+    high_tmp     += ans / seg_pow;
+    auto ans_tmp  = ans % seg_pow;
+    ans_tmp      *= lsh_pow;
+    ans_tmp      += rem / seg_pow;
+    if (!high_tmp && ans_tmp < divr_seg) {
+        high = ans;
+        dec_div_quot_idx_next(1, quot_idx, quot_it);
+        if (it_len) --it_len;
+        else ++ft_idx;
+    }
+    high = high_tmp;
+    ans  = ans_tmp;
+    return ans;
+} }
+
+int dec_div_next(uint64_t &ans, uint64_t &divd_0, uint64_t &divd_1, uint64_t divr) {
+    ans             = divd_0 / (divr / 1e19) + divd_1 / divr * 1.;
+    auto divd_0_tmp = 0ull,
+         divd_1_tmp = dec_mul(divd_0_tmp, divr, ans);
+    if (divd_0 == divd_0_tmp && divd_1 == divd_1_tmp) {
+        divd_0 = 0;
+        divd_1 = 0;
+        return NEUNET_DEC_CMP_EQL;
+    }
+    auto sub_carry = false;
+    auto divd_cmp  = 0;
+    if (divd_0 > divd_0_tmp || (divd_0 == divd_0_tmp && divd_1 > divd_1_tmp)) divd_cmp = NEUNET_DEC_CMP_GTR;
+    else divd_cmp = NEUNET_DEC_CMP_LES;
+    if (divd_cmp == NEUNET_DEC_CMP_GTR) {
+        divd_1_tmp = dec_sub(sub_carry, divd_1, divd_1_tmp);
+        divd_0_tmp = divd_0 - divd_0_tmp;
+    } else {
+        divd_1_tmp  = dec_sub(sub_carry, divd_1_tmp, divd_1);
+        divd_0_tmp -= divd_0;
+    }
+    if (sub_carry) --divd_0_tmp;
+    divd_0 = divd_0_tmp;
+    divd_1 = divd_1_tmp;
+    return divd_cmp;
+}
+uint64_t dec_div_next(uint64_t divd_0, uint64_t divd_1, uint64_t divr /*, bool rem = false */) {
+    auto ans = 0ull;
+    auto cmp = NEUNET_DEC_CMP_GTR;
+    neunet_dec_loop {
+        auto ans_tmp = 0ull;
+        if (divd_0) {
+            auto cmp_tmp = dec_div_next(ans_tmp, divd_0, divd_1, divr);
+            if (cmp == NEUNET_DEC_CMP_GTR) {
+                ans += ans_tmp;
+                cmp  = cmp_tmp;
+            } else {
+                ans -= ans_tmp;
+                if (cmp_tmp == NEUNET_DEC_CMP_GTR) cmp = NEUNET_DEC_CMP_LES;
+                else cmp = NEUNET_DEC_CMP_GTR;
+            }
+            if (cmp_tmp == NEUNET_DEC_CMP_EQL) return ans;
+            continue;
         }
-        ans.ft.reverse();
-        ans.ft = ans.ft.unit(src.ft);
+        break;
     }
-    dig_cnt %= NEUNET_DEC_DIG_MAX;
-    if (!dig_cnt) return ans;
-    seg_cnt = 1;
-    for (auto i = 0; i < dig_cnt; ++i) seg_cnt *= 10;
-    dig_cnt = NEUNET_DEC_SEG_MAX / seg_cnt;
-    for (auto i = ans.it.length; i; --i) {
-        auto seg_idx     = i - 1;
-        auto seg_tmp     = ans.it[seg_idx] % seg_cnt;
-        ans.it[seg_idx] /= seg_cnt;
-        ans.it[seg_idx] += seg_rem * dig_cnt;
-        seg_rem          = seg_tmp;
+    if (cmp == NEUNET_DEC_CMP_LES) {
+        ans -= divd_1 / divr;
+        if (divd_1 % divr) --ans;
+        return ans;
     }
-    if (ans.it.length) {
-        auto tmp = ans.it.length;
-        while (tmp && !ans.it[tmp - 1]) --tmp;
-        if (tmp) ans.it = ans.it.sub_set(0, tmp - 1);
-    }
-    for (auto i = 0ull; i < ans.ft.length; ++i) {
-        auto seg_tmp = ans.ft[i] % seg_cnt;
-        ans.ft[i]   /= seg_cnt;
-        ans.ft[i]   += seg_rem * dig_cnt;
-        seg_rem      = seg_tmp;
-    }
-    if (seg_rem) {
-        net_set<uint64_t> ft(ans.ft.length + 1);
-        ft.copy(0, ans.ft, 0, ans.ft.length);
-        ft[ans.ft.length] = seg_rem;
-        ans.ft = std::move(ft);
+    return ans + divd_1 / divr;
+}
+net_decimal_data dec_div_next(const net_decimal_data &divd, const net_decimal_data &divr, uint64_t prec) {
+    auto divd_tmp    = divd;
+    auto lsh         = false,
+         quot_it     = false;
+    auto lsh_pow     = 0ull,
+         seg_pow     = 0ull,
+         sh_cnt      = 0ull,
+         divr_seg    = dec_div_divr(divr, lsh_pow, seg_pow, sh_cnt, lsh),
+         quot_idx    = dec_div_quot_idx_init(divd.it.length, sh_cnt, lsh, quot_it),
+         divd_ft_idx = dec_div_divd_ft_idx(divd),
+         divd_it_len = divd.it.length,
+         divd_high   = 0ull;
+    net_decimal_data ans;
+    for (auto i = 0; i < prec; ++i) {
+        auto divd_seg = dec_div_divd(divd_tmp, divd_high, lsh_pow, seg_pow, divd_it_len, divd_ft_idx, divr_seg, quot_idx, quot_it),
+             quot_seg = dec_div_next(divd_high, divd_seg, divr_seg);
+        net_decimal_data quot;
+        if (quot_it) {
+            quot.it.init(quot_idx--);
+            quot.it[quot_idx] = quot_seg;
+            if (!quot_idx) quot_it = false;
+        } else {
+            auto idx = quot_idx;
+            quot.ft.init(++quot_idx);
+            quot.ft[idx] = quot_seg;
+        }
+        divd_tmp = dec_add(divd_tmp, dec_mul(divr, quot), true);
+        if (divd_it_len) divd_high = divd_tmp.it[--divd_it_len];
+        else if (divd_ft_idx < divd_tmp.ft.length) divd_high = divd_tmp.ft[divd_ft_idx++];
+        else divd_high = 0;
+        if (dec_is_zero(ans)) ans = std::move(quot);
+        else ans = dec_add(ans, quot);
     }
     return ans;
 }
@@ -327,107 +529,47 @@ int main(int argc, char *argv[], char *envp[]) {
     cout << "hello, world.\n" << endl;
     auto ch_tm_pt = NEUNET_CHRONO_TIME_POINT;
 
-    // 114679544494614864124.4184414 9913644494614864424.411416186156441646
-    // 1135147821456932545178 9632515584713416829 117.84541758316865039744481535232
-    // 114079544040094610408604012404100840414.00009900130640449040000000800644024400114106186156
-    
-    auto s = false;
-    auto a = dec_init(s, "1135147821456932545178"),
-         b = dec_init(s,    "9632515584713416829");
-    auto c = dec_rem(a, b);
-    cout << c << endl;
-    cout << a << endl;
-
-    // net_decimal::division_precision = 130;
-    // auto pi_val = net_decimal::pi();
-    // cout << pi_val << endl;
-
-    // uint64_t test_round = 1000000;
-    // auto test_time = NEUNET_CHRONO_TIME_POINT;
-    // for (auto i = 0ull; i < test_round; ++i) auto c = dec_mul(a, b);
-    // auto test_end = NEUNET_CHRONO_TIME_POINT;
-    // cout << "[normal][" << test_round << "][" << test_end - test_time << "ms]" << std::endl;
-    // test_time = NEUNET_CHRONO_TIME_POINT;
-    // for (auto i = 0ull; i < test_round; ++i) auto c = dec_fft_mul(a, b);
-    // test_end = NEUNET_CHRONO_TIME_POINT;
-    // cout << "[fft][" << test_round << "][" << test_end - test_time << "ms]" << std::endl;
-
-    // net_decimal a {-15},
-    //             b {-7};
-    // b.modulus = true;
-    // auto c = 15;
-    // c %= b;
-    // cout << c << endl;
-
-    // net_decimal::division_precision = 64;
-    // cout << ("1.35"_d).sin() << endl;
-
     /*
-    1101001000131080019200001.00010400002170800400005100
-    3179 / 256 = 12.41796875
-    17 / 128 = 0.1328125
-    1179 / 156 = 7.5576923076923076923076923076923
-    1741376 / 128 = 13604.5
-    14657816563.2 / 128 = 114514191.9
+    2222222222222222222; 16|0; 1111111111111111111|2222222222222222222
+    1111111111111111112 ->
+    1.9999999999999999982; 143; 9999999999999999993
+
+    1651516516641654951811416849849811514
+    0.0000000000000000000000516511651654848 ->
+    31
+    9744290637079135212
+    0567894985125648414
+    0382718827844325511.
+    6887946586157766950
+    2517352278691418898
+    9000786681055550561
+    98361501352881
+
+    1135147821456932545178
+    9632515584713416829
+    ans             117.
+    8454175831686503974
+    mod
+    8143498045462776185
+    last(+)
+    8143498045462776185
+
+    11351478214569325451789632515584713416829
+    69325451782515584713416829
+    ans 163741857033699.
+    9387570262015145428
+    mod         6507975
+    4955430815826696358
+    last(-)      424569
+    6827084768886720471
     */
-
-    // uint64_t divd_it_len = 25,
-    //          divr_it_len = 3;
-    // net_set<uint8_t> divd_coe = {1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 1, 3, 1, 0, 8, 0, 0, 1, 9, 2, 0, 0, 0, 0, 1},
-    //                  divr_coe = {1, 5, 6};
-    // uint64_t dig_cnt = 1,
-    //          seg_cnt = 300;
-    // if (divd_it_len >= divr_it_len) dig_cnt = divd_it_len - divr_it_len + 1;
-    // net_set<uint8_t> ans_set(dig_cnt + seg_cnt + 2);
-    // uint64_t ans_idx = 0;
-    // if (divd_it_len < divr_it_len) ans_idx = divr_it_len - divd_it_len;
-    // for (auto i = ans_idx; i < ans_set.length - 2; ++i) {
-    //     ans_set[i] = dec_div(divd_coe, divr_coe);
-    //     cout << '[' << (int)ans_set[i] << "][";
-    //     for (auto tmp : divd_coe) cout << (int)tmp << ' ';
-    //     cout << "\b]" << endl;
-    // }
-    // dig_cnt %= NEUNET_DEC_DIG_MAX;
-    // if (!dig_cnt) dig_cnt = NEUNET_DEC_DIG_MAX;
-    // uint64_t ans = 0;
-    // for (auto i = 0ull; i < ans_set.length - 2; ++i) {
-    //     ans *= 10;
-    //     ans += ans_set[i];
-    //     if (--dig_cnt) continue;
-    //     auto nidx = i + 1;
-    //     while (ans_set[nidx] < 0) {
-    //         --ans;
-    //         ans_set[nidx] += 10;
-    //     }
-    //     if (!ans_set[nidx]) {
-    //         auto carry = 0;
-    //         while (ans_set[nidx + 1] < 0) {
-    //             ans_set[nidx + 1] += 10;
-    //             --carry;
-    //         }
-    //         while (carry < 0) {
-    //             --ans;
-    //             carry += 10;
-    //         }
-    //         ans_set[nidx] = carry;
-    //     }
-    //     cout << ans << '|';
-    //     ans = 0;
-    //     dig_cnt = NEUNET_DEC_DIG_MAX;
-    // }
-    // while (dig_cnt--) ans *= 10;
-    // cout << ans << endl;
-
-    // auto sgn  = false;
-    // auto test = dec_init(sgn, "324938271560444852566064687276808488928"),
-    //      four = dec_init(sgn, 4);
-    // cout << dec_div_test(test, four, 0) << endl;
-
-    // uint64_t test_round = 10000000;
-    // auto test_time = NEUNET_CHRONO_TIME_POINT;
-    // for (auto i = 0ull; i < test_round; ++i) dec_div_test(test, four, 0);
-    // auto test_end = NEUNET_CHRONO_TIME_POINT;
-    // cout << "[normal][" << test_round << "][" << test_end - test_time << "ms]" << std::endl;
+    auto sgn  = false;
+    auto divd = dec_init(sgn, "1135147821456932545178"),
+         divr = dec_init(sgn, "9632515584713416829");
+    // cout << dec_div(divd, divr, 128) << endl;
+    // for (auto i = 0; i < 100000; ++i) dec_div(divd, divr, 128);
+    // cout << dec_div_next(divd, divr, 11) << endl;
+    // for (auto i = 0; i < 100000; ++i) dec_div_next(divd, divr, 11);
 
     cout << '\n' << (NEUNET_CHRONO_TIME_POINT - ch_tm_pt) << "ms" << endl;
     return EXIT_SUCCESS;
