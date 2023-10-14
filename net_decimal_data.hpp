@@ -186,30 +186,6 @@ net_decimal_data dec_init(bool &sgn, const std::string &src) {
     return ans;
 }
 
-std::string dec_to_string(bool sgn, const net_decimal_data &src) {
-    if (dec_is_zero(src)) return "0";
-    std::string ans = sgn ? "-" : "";
-    if (src.it.length) for (auto i = src.it.length; i; --i) {
-        auto tmp = std::to_string(src.it[i - 1]);
-        auto len = NEUNET_DEC_DIG_MAX - tmp.length();
-        if (i < src.it.length) for (auto i = 0; i < len; ++i) ans.push_back('0');
-        ans += tmp;
-    } else ans += "0";
-    if (src.ft.length) ans.push_back('.'); 
-    for (auto i = 0ull; i < src.ft.length; ++i) {
-        auto tmp = std::to_string(src.ft[i]);
-        auto len = NEUNET_DEC_DIG_MAX - tmp.length();
-        for (auto i = 0; i < len; ++i) ans.push_back('0');
-        if ((i + 1) == src.ft.length) {
-            len = tmp.length();
-            while (tmp[len - 1] == '0') --len;
-            tmp = tmp.substr(0, len);
-        }
-        ans += tmp;
-    }
-    return ans;
-}
-
 std::string dec_to_string_seg(uint64_t src) {
     std::string ans {"["};
     auto pow_exp = NEUNET_DEC_SEG_MAX / 10;
@@ -613,12 +589,12 @@ bool dec_gcd(net_decimal_data &fst, net_decimal_data &snd) {
     if (comp == NEUNET_DEC_CMP_EQL) return false;
     if (comp == NEUNET_DEC_CMP_GTR) {
         dec_rem(fst, snd);
-        // std::cout << dec_to_string(false, fst) << '\n' << dec_to_string(false, snd) << '\n' << std::endl;
+        // std::cout << fst << '\n' << snd << '\n' << std::endl;
         if (dec_is_zero(fst)) return true;
     }
     if (comp == NEUNET_DEC_CMP_LES) {
         dec_rem(snd, fst);
-        // std::cout << dec_to_string(false, fst) << '\n' << dec_to_string(false, snd) << '\n' << std::endl;
+        // std::cout << fst << '\n' << snd << '\n' << std::endl;
         if (dec_is_zero(snd)) return false;
     }
     return dec_gcd(fst, snd);
@@ -640,6 +616,9 @@ net_decimal_data dec_e10_mul(const net_decimal_data &src, uint64_t dig_cnt) {
         }
         ans.it.reverse();
         ans.it = ans.it.unit(src.it);
+    } else {
+        ans.it = src.it;
+        ans.ft = src.ft;
     }
     dig_cnt %= NEUNET_DEC_DIG_MAX;
     if (!dig_cnt) return ans;
@@ -681,7 +660,7 @@ net_decimal_data dec_e10_mul(const net_decimal_data &src, uint64_t dig_cnt) {
     return ans;
 }
 
-net_decimal_data dec_e10_div(const net_decimal_data &src, uint64_t dig_cnt, bool div = false) {
+net_decimal_data dec_e10_div(const net_decimal_data &src, uint64_t dig_cnt) {
     auto seg_cnt = dig_cnt / NEUNET_DEC_DIG_MAX,
          seg_rem = 0ull;
     net_decimal_data ans;       
@@ -696,6 +675,9 @@ net_decimal_data dec_e10_div(const net_decimal_data &src, uint64_t dig_cnt, bool
         }
         ans.ft.reverse();
         ans.ft = ans.ft.unit(src.ft);
+    } else {
+        ans.it = src.it;
+        ans.ft = src.ft;
     }
     dig_cnt %= NEUNET_DEC_DIG_MAX;
     if (!dig_cnt) return ans;
@@ -836,9 +818,9 @@ void dec_truncate(net_decimal_data &src, uint64_t prec) {
          last_dig = 0ull;
     // get last 2 digits after accuracy digits
     while (dig_idx-- > seg_len) {
-        last_dig             = seg_pow * (curr_seg % 10);
-        curr_seg            /= 10;
-        seg_pow             *= 10;
+        last_dig         = seg_pow * (curr_seg % 10);
+        curr_seg        /= 10;
+        seg_pow         *= 10;
         src.ft[tgt_idx] -= last_dig;
     }
     last_dig = curr_seg % 10;
@@ -865,73 +847,6 @@ void dec_truncate(net_decimal_data &src, uint64_t prec) {
         last_dig = src.ft[tgt_idx] % 10;
         if (last_dig < 5) src.ft[tgt_idx] -= last_dig;
     }
-}
-
-net_decimal_data dec_add(bool &ans_sgn, const net_decimal_data &fst, bool fst_sgn, const net_decimal_data &snd, bool snd_sgn) {
-    if (dec_is_zero(fst)) {
-        ans_sgn = snd_sgn;
-        return snd;
-    }
-    if (dec_is_zero(snd)) {
-        ans_sgn = fst_sgn;
-        return fst;
-    }
-    ans_sgn = false;
-    if (fst_sgn != snd_sgn) {
-        auto cmp_res = dec_comp(snd, fst);
-        if (cmp_res == NEUNET_DEC_CMP_GTR) {
-            if (snd_sgn) ans_sgn = true;
-            return dec_add(snd, fst, true);
-        }
-        if (cmp_res == NEUNET_DEC_CMP_LES) {
-            if (fst_sgn) ans_sgn = true;
-            return dec_add(fst, snd, true);
-        }
-        return {};
-    }
-    if (fst_sgn) ans_sgn = true;
-    return dec_add(fst, snd);
-}
-
-net_decimal_data dec_sub(bool &ans_sgn, const net_decimal_data &minu, bool minu_sgn, const net_decimal_data &subt, bool subt_sgn) {
-    if (dec_is_zero(subt)) {
-        ans_sgn = minu_sgn;
-        return minu;
-    }
-    if (dec_is_zero(minu)) {
-        ans_sgn = !minu_sgn;
-        return subt;
-    }
-    ans_sgn = false;
-    if (minu_sgn == subt_sgn) {
-        auto cmp_res = dec_comp(minu, subt);
-        if (cmp_res == NEUNET_DEC_CMP_GTR) {
-            if (minu_sgn) ans_sgn = true;
-            return dec_add(minu, subt, true);
-        }
-        if (cmp_res == NEUNET_DEC_CMP_LES) {
-            if (!minu_sgn) ans_sgn = true;
-            return dec_add(subt, minu, true);
-        }
-        return {};
-    }
-    if (minu_sgn) ans_sgn = true;
-    return dec_add(minu, subt);
-}
-
-net_decimal_data dec_mul(bool &ans_sgn, const net_decimal_data &fst, bool fst_sgn, const net_decimal_data &snd, bool snd_sgn) {
-    ans_sgn = fst_sgn != snd_sgn;
-    if (dec_is_zero(fst) || dec_is_zero(snd)) return {};
-    if (dec_is_one(fst)) return snd;
-    if (dec_is_one(snd)) return fst;
-    return dec_mul(fst, snd);
-}
-
-net_decimal_data dec_div(bool &ans_sgn, const net_decimal_data &divd, bool divd_sgn, const net_decimal_data &divr, bool divr_sgn, uint64_t prec) {
-    ans_sgn = divd_sgn != divr_sgn;
-    if (dec_is_zero(divd)) return {};
-    if (dec_is_zero(divr)) return divd;
-    return dec_div(divd, divr, prec);
 }
 
 NEUNET_END

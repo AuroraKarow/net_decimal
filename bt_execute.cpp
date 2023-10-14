@@ -335,15 +335,15 @@ void main(){
 	// std::cout << dec_to_string(k_sgn, k0) << std::endl;
     auto K = k1, K1 = dec_bit_k1(), K2 = dec_bit_k1();
     dec_bit_lt_one(K1);
-	std::cout << "<<: " << dec_to_string(k_sgn, K1) << std::endl;
+	std::cout << "<<: " << K1 << std::endl;
     dec_bit_rt_one(K1, 1);
-	std::cout << ">>: " << dec_to_string(k_sgn, K1) << std::endl;
+	std::cout << ">>: " << K1 << std::endl;
     dec_lt_move(K1, 63);
-	std::cout << "63: " << dec_to_string(k_sgn, K1) << std::endl;
+	std::cout << "63: " << K1 << std::endl;
     dec_lt_move(K1, 1);
-	std::cout << "64: " << dec_to_string(k_sgn, K1) << std::endl;
+	std::cout << "64: " << K1 << std::endl;
     dec_rt_move(K1, 63);
-	std::cout << "1: " << dec_to_string(k_sgn, K1) << std::endl;
+	std::cout << "1: " << K1 << std::endl;
 
     auto start = NEUNET_CHRONO_TIME_POINT;
 	// for(uint64_t l = 0; l < 1000000000000000000; l++){
@@ -393,22 +393,22 @@ void main(){
     dec_bit_not(K);
 	std::cout << k1.it << std::endl;
 	std::cout << k2.it << std::endl;
-	std::cout << dec_to_string(k_sgn, K) << std::endl;
+	std::cout << K << std::endl;
     dec_lt_move(K2, 123);
     // for(int a = 120; a < 128; a++){
     //     dec_bit_lt_one(K2);
     // 	std::cout << dec_to_string(k_sgn, K2) << std::endl;
     // 	// std::cout << K2.it << std::endl;
     // }
-	std::cout << dec_to_string(k_sgn, k1) << std::endl;
-	std::cout << dec_to_string(k_sgn, K2) << std::endl;
+	std::cout << k1 << std::endl;
+	std::cout << K2 << std::endl;
     // dec_bit_not(k3);
     auto k001 = dec_bit_and(k3, k4);
-	std::cout << "3: " << dec_to_string(k_sgn, k3) << std::endl;
+	std::cout << "3: " << k3 << std::endl;
     // dec_bit_not(k4, true);
-	std::cout << "4: " << dec_to_string(k_sgn, k4) << std::endl;
-	std::cout << "k_ans: " << dec_to_string(k_sgn, k001) << std::endl;
-	std::cout << "K: " << dec_to_string(k_sgn, dec_bit_val(k001)) << std::endl;
+	std::cout << "4: " << k4 << std::endl;
+	std::cout << "k_ans: " << k001 << std::endl;
+	std::cout << "K: " << dec_bit_val(k001) << std::endl;
     // 10111:23 101001:41 100000010 100000001 11111110
 }
 

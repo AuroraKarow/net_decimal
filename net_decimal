@@ -30,15 +30,14 @@
 #define NEUNET_DEC_CMP_LES          0x0001
 #define NEUNET_DEC_CMP_GTR          0x0002
 
-#define neunet_dec_loop             while (true)
-
 #define neunet_t_arr_len(type, arg) type[sizeof(arg) / sizeof(type)]
 
+#define neunet_dec_init_expr        std::is_arithmetic_v<arg> ||\
+                                    std::is_same_v<arg, neunet_t_arr_len(char, arg)> ||\
+                                    std::is_same_v<std::string, arg>,\
+                                    "A arithmetic or string type value is needed."
+
 #define neunet_dec_type(type)       std::remove_reference_t<type>
-
-#define neunet_dec_ref(type)        std::is_same_v<neunet::net_decimal,\
-                                    neunet_dec_type(type)>
-
 #define neunet_dec_num(type)        std::is_arithmetic_v<\
                                     neunet_dec_type(type)>
 
@@ -48,43 +47,10 @@
                                              typename neunet_dec_enable\
                                                       (neunet_number_arg)>
 
-#define neunet_type_if(is_type)     if constexpr (is_type) {
-#define neunet_type_elif(is_type)   } else if constexpr (is_type) {
-#define neunet_type_else            } else {
-#define neunet_type_endif           }
+#define neunet_dec_loop             while (true)
 
-#define neunet_dec_init_expr        std::is_arithmetic_v<arg> ||\
-                                    std::is_same_v<arg, neunet_t_arr_len(char, arg)> ||\
-                                    std::is_same_v<std::string, arg>,\
-                                    "A arithmetic or string type value is needed."
-
-#define neunet_dec_ins              std::is_same_v<ins, neunet::net_decimal> ||\
-                                    std::is_same_v<ins, neunet::net_decimal_data> ||\
-                                    std::is_same_v<ins, neunet::net_decimal_frac>
-
-#define callback_dec_ins            template<typename ins,\
-                                             typename neunet_dec_enable(neunet_dec_ins)>
-
-#define neunet_dec_ref_s(fst, snd)  neunet_dec_enable((neunet_dec_ref(fst) ||\
-                                                       neunet_dec_num(fst)) &&\
-                                                      (neunet_dec_ref(snd) ||\
-                                                       neunet_dec_num(snd)))
-
-#define callback_dec                template<typename dec_t,\
-                                             typename neunet_dec_enable(\
-                                                     (neunet_dec_ref(dec_t) ||\
-                                                      neunet_dec_num(dec_t)))>
-
-#define callback_dec_s              template<typename fst_dec_t,\
-                                             typename snd_dec_t,\
-                                             typename neunet_dec_ref_s(fst_dec_t,\
-                                                                       snd_dec_t)>
-
-#define callback_dec_arg_ref        template<typename arg,\
-                                             typename neunet_dec_enable\
-                                             (std::is_arithmetic_v<arg>)>
 #include "net_decimal_data.hpp"
-#include "net_decimal_frac.hpp"
+#include "net_decimal_base.hpp"
 #include "net_decimal.hpp"
 
 #endif

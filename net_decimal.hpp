@@ -1,258 +1,60 @@
 NEUNET_BEGIN
 
-// NOT thread safety
-class {
-private:
-    net_set<net_decimal_data> prec;
-    
-public:
-    net_decimal_data get(uint64_t precision) {
-        if (!precision) return dec_e10(0);
-        --precision;
-        if (precision >= prec.length) {
-            auto len = prec.length;
-            if (!len) len = 128;
-            while (len < precision) len <<= 1;
-            prec.init(len);
-        }
-        if (dec_is_zero(prec[precision])) prec[precision] = dec_e10(precision + 1);
-        return prec[precision];
-    }
-
-} net_decimal_prec;
-
-// NOT thread safety
-class {
-private:
-    net_decimal_data b,
-                     c,
-                     s,
-                     o,
-                     p,
-                     q,
-                     a;
-
-    bool need_init = true;
-
-    uint64_t prec = 0;
-
-public:
-    net_decimal_data get(uint64_t precision) {
-        if (precision <= prec) return a;
-        prec = precision;
-        if (need_init) {
-            need_init = false;
-            auto sgn  = false;
-            b = dec_init(sgn, 1);
-            c = dec_init(sgn, 2);
-            s = dec_init(sgn, "0.6");
-            o = dec_init(sgn, "0.36");
-            q = b;
-        }
-        net_decimal_data d;
-        do {
-            if (dec_comp(b, q) == NEUNET_DEC_CMP_EQL) p = dec_add(p, s);
-            else {
-                p = dec_add(dec_mul(b, p), dec_mul(s, q));
-                q = dec_mul(q, b);
-            }
-            s = dec_mul(s, o);
-            b = dec_add(b, c);
-            d = dec_e10_mul(s, precision + 2);
-        } while (dec_comp(d, b) == NEUNET_DEC_CMP_GTR);
-        a = dec_mul(c, dec_div(p, q, prec));
-        return a;
-    }
-
-} net_decimal_ln4;
-
-// NOT thread safety
-class {
-private:
-    bool on  = false,
-         sgn = false;
-
-    std::atomic_uint64_t prec = 0;
-
-    net_decimal_data p, q,
-                     // +2
-                     a,
-                     // +4
-                     b, 
-                     // +8
-                     c, d,
-                     o, s,
-                     dec_2,
-                     dec_4,
-                     dec_8;
-    
-    void init() {
-        if (on) return;
-        p = dec_init(sgn, 0);
-        q = dec_init(sgn, 1);
-        a = dec_init(sgn, 0.25);
-        b = dec_init(sgn, 2);
-        c = dec_init(sgn, 5);
-        d = dec_init(sgn, 6);
-        o = dec_init(sgn, 0.0625);
-        s = q;
-        dec_2 = dec_init(sgn, 2);
-        dec_4 = dec_init(sgn, 4);
-        dec_8 = dec_init(sgn, 8);
-        on = true;
-    }
-
-public:
-    net_decimal_data get(uint64_t precision) {
-        init();
-        while (prec < precision) {
-            
-            auto u = dec_init(sgn, 1),
-                 v = a;
-            u = dec_add(dec_mul(b, u), v, true);
-            v = dec_mul(v, b);
-            u = dec_add(dec_mul(c, u), v, true);
-            v = dec_mul(v, c);
-            u = dec_add(dec_mul(d, u), v, true);
-            v = dec_mul(v, d);
-            u = dec_mul(u, s);
-            if (dec_comp(q, v) == NEUNET_DEC_CMP_EQL) p = dec_add(p, u);
-            else {
-                p = dec_add(dec_mul(v, p), dec_mul(u, q));
-                q = dec_mul(v, q);
-            }
-            s = dec_mul(s, o);
-            a = dec_add(a, dec_2);
-            b = dec_add(b, dec_4);
-            c = dec_add(c, dec_8);
-            d = dec_add(d, dec_8);
-            ++prec;
-        }
-        return dec_div(p, q, precision);
-    }
-
-} net_decimal_pi;
-
 class net_decimal {
 public:
-    bool modulus_mode    = false,
-         fraction_reduct = false;
+    bool modulus_mode = false;
 
     uint64_t division_precision = 32;
 
 protected:
     void value_assign(const net_decimal &src) {
         sgn                = src.sgn;
-        dec                = src.dec;
         modulus_mode       = src.modulus_mode;
-        fraction_reduct    = src.fraction_reduct;
         division_precision = src.division_precision;
     }
 
     void value_copy(const net_decimal &src) {
         value_assign(src);
-        base = src.base;
-        frac = src.frac;
+        num = src.num;
+        den = src.den;
     }
 
     void value_move(net_decimal &&src) {
         value_assign(src);
-        base = std::move(src.base);
-        frac = std::move(src.frac);
+        num = std::move(src.num);
+        den = std::move(src.den);
     }
 
-    bool is_zero() {
-        if (dec) return dec_is_zero(base);
-        if (!dec_is_zero(frac)) return false;
-        base = dec_init(dec, 0);
-        dec  = true;
-        return true;
-    }
+    bool is_zero() const { return dec_is_zero(num); }
 
-    bool is_one() {
-        if (dec) return dec_is_one(base);
-        if (!dec_is_one(frac)) return false;
-        base = dec_init(dec, 1);
-        dec  = true;
-        return true;
-    }
+    bool is_one() const { return dec_comp(den, num) == NEUNET_DEC_CMP_EQL; }
+
+    bool is_dec() const { return dec_is_zero(den); }
 
     bool is_integer() {
-        if (dec) return !base.ft.length;
-        dec_reduct(frac);
-        if (!dec_is_one(frac.den)) return false;
-        dec  = true;
-        base = frac.num;
-        return true;
-    }
-
-    void frac_init(net_decimal &u, net_decimal &v) {
-        if (dec) {
-            u = *this;
-            v = 1;
-        } else {
-            u.sgn  = sgn;
-            u.base = frac.num;
-            v.base = frac.den;
+        auto zero_flag = is_zero(),
+             one_flag  = is_one();
+        if (zero_flag || one_flag) {
+            den.reset();
+            if (one_flag) num = dec_init(sgn, 1);
+            return true;
         }
+        if (is_dec()) return !num.ft.length;
+        reduct();
+        return dec_is_one(den);
     }
 
-    // ln(x + 1) = (-1 < x <= 1)
-    net_decimal ln_2(uint64_t prec) {
-        net_decimal b {1},
-                    p {0},
-                    q {b},
-                    x {*this - 1},
-                    o {x},
-                    c {b},
-                    a {p};
-        net_decimal_data d;
-        do {
-            if (b == q) p += x;
-            else {
-                p  = b * p + c * x * q;
-                q *= b;
-            }
-            x *= o;
-            ++b;
-            d = dec_e10_mul(x.base, division_precision + 2);
-            c.sgn  = !c.sgn;
-        } while (dec_comp(d, b.base) == NEUNET_DEC_CMP_GTR);
-        a.base = dec_div(a.sgn, p.base, p.sgn, q.base, q.sgn, prec);
-        return a;
-    }
-
-    net_decimal sin_cos_proto(net_decimal &u, net_decimal &v, net_decimal &b) {
-        net_decimal c {1},
-                    q {c},
-                    p {0},
-                    g {p},
-                    h {p},
-                    m {p},
-                    n {p},
-                    o {*this * (*this)};
-        if (!dec) {
-            g.base = o.frac.num;
-            h.base = o.frac.den;
+    void frac_norm() {
+        if (is_dec()) den = dec_init(red, 1);
+        net_decimal_data e10;
+        if (num.ft.length) {
+            num = dec_e10(e10, num);
+            den = dec_mul(e10, den);
         }
-        net_decimal_data d;
-        do {
-            if (q == v) p += c * u;
-            else {
-                p  = v * p + c * q * u;
-                q *= v;
-            }
-            if (dec) u *= o;
-            else {
-                u *= g;
-                v *= h;
-            }
-            for (auto i = 0; i < 2; ++i) v *= (++b);
-            c.sgn = !c.sgn;
-            d = dec_e10_mul(u.base, division_precision + 2);
-        } while (dec_comp(d, v.base) == NEUNET_DEC_CMP_GTR);
-        n.base = dec_div(n.sgn, p.base, p.sgn, q.base, q.sgn, division_precision);
-        return n;
+        if (den.ft.length) {
+            den = dec_e10(e10, den);
+            num = dec_mul(e10, num);
+        }
     }
 
 public:
@@ -261,134 +63,174 @@ public:
     net_decimal(net_decimal &&src) { value_move(std::move(src)); }
     callback_arg net_decimal(const arg &src) {
         static_assert(neunet_dec_init_expr);
-        base = dec_init(sgn, src);
+        num = dec_init(sgn, src);
     }
 
-    std::string to_string() {
-        if (dec) return dec_to_string(sgn, base);
-        return dec_to_string(sgn, frac, division_precision);
+    void reduct() {
+        if (red) return;
+        else red = true;
+        if (is_dec() && !num.ft.length) return;
+        auto zero_valid = is_zero(),
+             one_valid  = is_one();
+        if (zero_valid || one_valid) {
+            if (one_valid) num = den;
+            return;
+        }
+        if (num.ft.length || den.ft.length) frac_norm();
+        auto fst = num,
+             snd = den;
+        auto res = dec_gcd(fst, snd);
+        net_decimal_data fac;
+        if (res) fac = std::move(snd);
+        else fac = std::move(fst);
+        num = dec_rem(num, fac);
+        den = dec_rem(den, fac);
     }
 
-    int64_t to_integer() {
-        if (dec) return dec_to_integer(sgn, base);
-        return dec_to_integer(sgn, frac);
+    int64_t to_integer() const {
+        if (is_dec()) return dec_to_integer(sgn, num);
+        net_decimal_data ans_num = num;
+        ans_num = dec_rem(ans_num, den);
+        return dec_to_integer(sgn, ans_num);
     }
 
-    long double to_float() {
-        if (dec) return dec_to_float(sgn, base);
-        return dec_to_float(sgn, frac);
+    long double to_float() const {
+        if (is_dec()) return dec_to_float(sgn, num);
+        return dec_to_float(sgn, dec_div(num, den, NEUNET_DEC_VLD_DIG - 2));
     }
 
-    net_decimal float_part(net_decimal &integer_part) {
+    net_decimal float_part(net_decimal &integer_part) const {
         integer_part.reset();
         integer_part.sgn = sgn;
         net_decimal ans;
         ans.sgn = sgn;
-        if (dec) ans.base = dec_float_part(integer_part.base, base);
-        else {
-            ans.frac = dec_float_part(integer_part.base, frac);
-            ans.dec  = false;
+        if (is_dec()) {
+            ans.num = dec_float_part(integer_part.num, num);
+            return ans;
         }
+        ans = *this;
+        ans.reduct();
+        integer_part.num = dec_rem(ans.num, ans.den);
         return ans;
-    }    
+    }
 
-    int comp(net_decimal &src) {
+    net_decimal remainder(net_decimal &divr) {
+        net_assert(is_integer() && divr.is_integer(), "net_decimal", "remiander", "Parameters should be integer.");
+        net_decimal ans = *this;
+        dec_rem(ans.num, divr.num);
+        if (divr.modulus_mode && sgn != divr.sgn) ans.num = dec_add(ans.sgn, ans.num, ans.sgn, divr.num, divr.sgn);
+        return ans;
+    }
+
+    callback_dec_arg static void remainder(arg &divd, net_decimal &divr) {
+        static_assert(std::is_integral_v<arg>, "Dividend should be an integer.");
+        net_assert(divr.is_integer(), "net_decimal", "(int64_t)%=", "Divisior should be an integer.");
+        net_assert(divr.num.it.length == 1 && ((divr.sgn && divr.num.it[0] < LLONG_MAX) || !divr.sgn), "net_decimal", "(int64_t)%=", "Divisior digit count is greater than significant figure of built-in arithmetric type.");
+        auto divr_arith = divr.to_integer();
+        auto divd_sgn   = divd < 0;
+        divd = divd % divr_arith;
+        if (divr.modulus_mode && divd_sgn != divr.sgn) divd += divr_arith;
+        if (divd_sgn == divr.sgn && divd_sgn) divd *= (-1);
+    }
+
+    int compare(const net_decimal &src) const {
         if (sgn != src.sgn) return sgn ? NEUNET_DEC_CMP_LES : NEUNET_DEC_CMP_GTR;
-        if (dec && dec == src.dec) return dec_comp(sgn, dec_comp(base, src.base));
-        if (!dec_is_valid(frac)) frac = dec_init(base);
-        if (!dec_is_valid(src.frac)) src.frac = dec_init(src.base);
-        auto fst_num = dec_mul(frac.num, src.frac.den),
-             snd_num = dec_mul(src.frac.num, frac.den);
-        return dec_comp(fst_num, snd_num);
+        auto this_dec = is_dec(),
+             src_dec  = src.is_dec();
+        if (this_dec && src_dec) return dec_comp(sgn, dec_comp(num, src.num));
+        if (this_dec && !src_dec) return dec_comp(sgn, dec_comp(dec_mul(num, src.den), src.num));
+        if (!this_dec && src_dec) return dec_comp(sgn, dec_comp(num, dec_mul(den, src.num)));
+        return dec_comp(sgn, dec_comp(dec_mul(num, src.den), dec_mul(src.num, den)));
     }
 
     void reset() {
-        base.reset();
-        frac.reset();
-        division_precision = 32;
-        fraction_reduct    = false;
-        modulus_mode       = false;
-        dec                = true;
+        num.reset();
+        den.reset();        
         sgn                = false;
+        modulus_mode       = false;
+        division_precision = 32;
     }
 
     ~net_decimal() { reset(); }
 
     net_decimal abs() const {
-        auto tmp (*this);
-        tmp.sgn = false;
-        return tmp;
+        if (!sgn) return *this;
+        net_decimal ans {*this};
+        ans.sgn = false;
+        return ans;
     }
 
-    net_decimal ln() {
+    net_decimal ln() const {
         if (is_zero() || is_one() || sgn) return {};
-        if (!dec) {
-            net_decimal num, den;
-            num.base = frac.num;
-            den.base = frac.den;
-            return num.ln() / den.ln();
+        net_decimal ans;
+        auto minu_sgn = false;
+        auto minu_ans = dec_ln(minu_sgn, num, division_precision);
+        if (is_dec()) {
+            ans.num = std::move(minu_ans);
+            ans.sgn = minu_sgn;
+            return ans;
         }
-        net_decimal cnt  {0},
-                    base {*this};
-        if (base < 1) return base.ln_2(division_precision);
-        while (base > 1) {
-            base *= 0.25;
+        auto subt_sgn = false;
+        auto subt_ans = dec_ln(subt_sgn, den, division_precision);
+        ans.num = dec_sub(ans.sgn, minu_ans, minu_sgn, subt_ans, subt_sgn);
+        return ans;
+    }
+
+    net_decimal exp() const {
+        /*
+        auto src = 216_d,
+             fra = 0.5_d;
+        auto cnt = 0ull;
+        while (src > 10) {
+            src *= fra;
             ++cnt;
         }
-        cnt.base = dec_mul(cnt.sgn, cnt.base, false, net_decimal_ln4.get(division_precision), false);
-        return base.ln_2(division_precision) + cnt;
+        auto src_prec = src.division_precision,
+             src_fold = (uint64_t)std::log2(cnt);
+        for (auto i = 0; i < src_fold; ++i) src.division_precision += src.division_precision;
+        auto ans = src.exp();
+        for (auto i = 0ull; i < cnt; ++i) ans *= ans;
+        ans.division_precision = src_prec;
+        ans.truncate();
+        */
+        net_decimal ans;
+        if (is_zero()) {
+            ans.num = dec_init(ans.sgn, 1);
+            return ans;
+        }
+        ans.num = dec_exp(ans.sgn, num, den, sgn, division_precision);
+        return ans;
     }
 
-    net_decimal exp() {
-        net_decimal c {1},
-                    p {c},
-                    q {c},
-                    v {0},
-                    u {v},
-                    m {v},
-                    n {v},
-                    a {v};
-        frac_init(u, v);
-        frac_init(m, n);
-        net_decimal_data d;
-        do {
-            if (q == v) p += u;
-            else {
-                p  = v * p + u * q;
-                q *= v;
-            }
-            ++c;
-            if (dec) {
-                u *= *this;
-                v *= c;
-            } else {
-                u *= m;
-                v *= c * n;
-            }
-            d = dec_e10_mul(u.base, division_precision + 2);
-        } while (dec_comp(d, v.base) == NEUNET_DEC_CMP_GTR);
-        a.base = dec_div(a.sgn, p.base, p.sgn, q.base, q.sgn, division_precision);
-        return a;
+    net_decimal sin() const {
+        // TODO inducing formula
+        net_decimal ans;
+        auto b  = dec_init(ans.sgn, 1),
+             u  = num,
+             v  = den;
+        ans.num = dec_sin_cos(ans.sgn, num, den, sgn, u, v, b, division_precision);
+        return ans;
     }
 
-    net_decimal sin() {
-        net_decimal  b {1},
-                     u {0},
-                     v {u};
-        frac_init(u, v);
-        return sin_cos_proto(u, v, b);
+    net_decimal cos() const {
+        // TODO inducing formula
+        net_decimal ans,
+                    pi_2;
+        auto b = dec_init(ans.sgn, 0),
+             u = dec_init(ans.sgn, 1),
+             v = u;
+        pi_2.num = net_decimal_pi.get(division_precision * 2);
+        if (*this > pi_2) {
+            auto src {*this},
+                 tmp {src / pi_2};
+            dec_float_part(ans.num, dec_div(tmp.num, tmp.den, 4));
+            src -= ans * pi_2;
+            ans.num = dec_sin_cos(ans.sgn, src.num, src.den, sgn, u, v, b, division_precision);
+        } else ans.num = dec_sin_cos(ans.sgn, num, den, sgn, u, v, b, division_precision);
+        return ans;
     }
 
-    net_decimal cos() {
-        net_decimal b {0},
-                    u {1},
-                    v {u};
-        return sin_cos_proto(u, v, b);
-    }
-
-    callback_dec net_decimal pow(dec_t &&times) {
-        neunet_type_if (neunet_dec_num(dec_t)) return pow(net_decimal{times});
-        neunet_type_else
+    net_decimal pow(const net_decimal &times) const {
         if (is_zero()) return 0.;
         if ((!sgn && is_one()) || times.is_zero()) return 1;
         if (times.is_one()) {
@@ -397,7 +239,7 @@ public:
         }
         if (!sgn) return (times * ln()).exp();
         net_decimal piv {0};
-        piv.base = net_decimal_pi.get(division_precision + 1);
+        piv.num = net_decimal_pi.get(division_precision + 1);
         net_decimal ans {0},
                     pia {piv * times},
                     prd {ans};
@@ -409,7 +251,7 @@ public:
             ans = prd.sin();
             if (ans.is_zero()) {
                 prd = prd.cos();
-                dec_truncate(prd.base, division_precision);
+                dec_truncate(prd.num, division_precision);
                 if (sgn) return abs().pow(times) * prd;
                 return pow(times) * prd;
             }
@@ -417,16 +259,20 @@ public:
             cnt += 2;
         } while (res_cnt == 1 || ans != res[0]);
         return ans;
-        neunet_type_endif
     }
-    
+
+    void truncate() {
+        if (!is_dec()) return;
+        dec_truncate(num, division_precision);
+    }
+
 protected:
-    net_decimal_data base;
+    // numerator / denominator
+    net_decimal_data num, 
+                     den;
 
-    net_decimal_frac frac;
-
-    bool dec = true,
-         sgn = false;
+    bool sgn = false,
+         red = false;
 
 public:
     net_decimal &operator=(const net_decimal &src) {
@@ -438,51 +284,39 @@ public:
         return *this;
     }
 
-    callback_dec_s friend bool operator==(fst_dec_t &&fst, snd_dec_t &&snd) {
-        neunet_type_if (neunet_dec_num(fst_dec_t)) return net_decimal {fst} == snd;
-        neunet_type_elif (neunet_dec_num(snd_dec_t)) return fst == net_decimal {snd};
-        neunet_type_else return fst.comp(snd) == NEUNET_DEC_CMP_EQL;
-        neunet_type_endif
-    }
-    callback_dec_s friend auto operator<=>(fst_dec_t &&fst, snd_dec_t &&snd) {
-        neunet_type_if (neunet_dec_num(fst_dec_t)) return net_decimal {fst} <=> snd;
-        neunet_type_elif (neunet_dec_num(snd_dec_t)) return fst <=> net_decimal {snd};
-        neunet_type_else
-        if (fst.sgn != snd.sgn) return fst.sgn ? std::strong_ordering::less : std::strong_ordering::greater;
-        auto cmp_res = fst.comp(snd);
-        if (cmp_res == NEUNET_DEC_CMP_LES) return fst.sgn ? std::strong_ordering::greater : std::strong_ordering::less;
-        if (cmp_res == NEUNET_DEC_CMP_GTR) return fst.sgn ? std::strong_ordering::less : std::strong_ordering::greater;
+    friend bool operator==(const net_decimal &fst, const net_decimal &snd) { return fst.compare(snd) == NEUNET_DEC_CMP_EQL; }
+    friend std::strong_ordering operator<=>(const net_decimal &fst, const net_decimal &snd) {
+        auto cmp = fst.compare(snd);
+        if (cmp == NEUNET_DEC_CMP_LES) return std::strong_ordering::less;
+        if (cmp == NEUNET_DEC_CMP_GTR) return std::strong_ordering::greater;
         return std::strong_ordering::equal;
-        neunet_type_endif
     }
 
     net_decimal operator+() { return *this; }
-    callback_dec_s friend net_decimal operator+(fst_dec_t &&fst, snd_dec_t &&snd) {
-        // first is arithmetic type
-        neunet_type_if (neunet_dec_num(fst_dec_t)) return net_decimal {fst} + snd;
-        // second is arithmetic type
-        neunet_type_elif (neunet_dec_num(snd_dec_t)) return fst + net_decimal {snd};
-        // both are decimal
-        neunet_type_else
+    friend net_decimal operator+(const net_decimal &fst, const net_decimal &snd) {
         net_decimal ans;
-        // TODO define addition function
-        if (fst.dec && snd.dec) {
-            ans.base = dec_add(ans.sgn, fst.base, fst.sgn, snd.base, snd.sgn);
+        auto fst_dec = fst.is_dec(),
+             snd_dec = snd.is_dec();
+        if (fst_dec && snd_dec) {
+            ans.num = dec_add(ans.sgn, fst.num, fst.sgn, snd.num, snd.sgn);
             return ans;
         }
-        if (!dec_is_valid(fst.frac)) fst.frac = dec_init(fst.base, fst.fraction_reduct);
-        if (!dec_is_valid(snd.frac)) snd.frac = dec_init(snd.base, snd.fraction_reduct);
-        ans.dec  = false;
-        ans.frac = dec_add(ans.sgn, fst.frac, fst.sgn, snd.frac, snd.sgn, false);
+        if (fst_dec && !snd_dec) {
+            ans.den = snd.den;
+            ans.num = dec_add(ans.sgn, dec_mul(fst.num, snd.den), fst.sgn, snd.num, snd.sgn);
+            return ans;
+        }
+        if (!fst_dec && snd_dec) {
+            ans.den = fst.den;
+            ans.num = dec_add(ans.sgn, fst.num, fst.sgn, dec_mul(snd.num, fst.den), snd.sgn);
+            return ans;
+        }
+        ans.den = dec_mul(fst.den, snd.den);
+        ans.num = dec_add(ans.sgn, dec_mul(fst.num, snd.den), fst.sgn, dec_mul(snd.num, fst.den), snd.sgn);
         return ans;
-        neunet_type_endif
     }
-    callback_dec void operator+=(dec_t &&src) {
-        neunet_type_if (neunet_dec_num(dec_t)) *this = *this + net_decimal {src};
-        neunet_type_else *this = *this + src;
-        neunet_type_endif
-    }
-    callback_dec_arg_ref friend void operator+=(arg &fst, net_decimal &snd) { fst += snd.to_float(); }
+    void operator+=(const net_decimal &snd) { *this = *this + snd; }
+    callback_dec_arg friend void operator+=(arg &fst, const net_decimal &snd) { fst += snd.to_float(); }
     net_decimal &operator++() {
         *this += 1;
         return *this;
@@ -494,32 +328,30 @@ public:
     }
 
     net_decimal operator-() { return 0 - *this; }
-    callback_dec_s friend net_decimal operator-(fst_dec_t &&minu, snd_dec_t &&subt) {
-        // first is arithmetic type
-        neunet_type_if (neunet_dec_num(fst_dec_t)) return net_decimal {minu} - subt;
-        // second is arithmetic type
-        neunet_type_elif (neunet_dec_num(snd_dec_t)) return minu - net_decimal {subt};
-        // both are decimal
-        neunet_type_else
+    friend net_decimal operator-(const net_decimal &minu, const net_decimal &subt) {
         net_decimal ans;
-        // TODO define subtraction function
-        if (minu.dec && subt.dec) {
-            ans.base = dec_sub(ans.sgn, minu.base, minu.sgn, subt.base, subt.sgn);
+        auto minu_dec = minu.is_dec(),
+             subt_dec = subt.is_dec();
+        if (minu_dec && subt_dec) {
+            ans.num = dec_sub(ans.sgn, minu.num, minu.sgn, subt.num, subt.sgn);
             return ans;
         }
-        if (!dec_is_valid(minu.frac)) minu.frac = dec_init(minu.base, minu.fraction_reduct);
-        if (!dec_is_valid(subt.frac)) subt.frac = dec_init(subt.base, subt.fraction_reduct);
-        ans.dec  = false;
-        ans.frac = dec_sub(ans.sgn, minu.frac, minu.sgn, subt.frac, subt.sgn, false);
+        if (minu_dec && !subt_dec) {
+            ans.den = subt.den;
+            ans.num = dec_sub(ans.sgn, dec_mul(minu.num, subt.den), minu.sgn, subt.num, subt.sgn);
+            return ans;
+        }
+        if (!minu_dec && subt_dec) {
+            ans.den = minu.den;
+            ans.num = dec_sub(ans.sgn, minu.num, minu.sgn, dec_mul(subt.num, minu.den), subt.sgn);
+            return ans;
+        }
+        ans.den = dec_mul(minu.den, subt.den);
+        ans.num = dec_sub(ans.sgn, dec_mul(minu.num, subt.den), minu.sgn, dec_mul(subt.num, minu.den), subt.sgn);
         return ans;
-        neunet_type_endif
     }
-    callback_dec void operator-=(dec_t &&src) {
-        neunet_type_if (neunet_dec_num(dec_t)) *this = *this - net_decimal {src};
-        neunet_type_else *this = *this - src;
-        neunet_type_endif
-    }
-    callback_dec_arg_ref friend void operator-=(arg &fst, net_decimal &snd) { fst -= snd.to_float(); }
+    void operator-=(const net_decimal &subt) { *this = *this - subt; }
+    callback_dec_arg friend void operator-=(arg &minu, const net_decimal &subt) { minu -= subt.to_float(); }
     net_decimal &operator--() {
         *this -= 1;
         return *this;
@@ -530,148 +362,67 @@ public:
         return tmp;
     }
 
-    callback_dec_s friend net_decimal operator*(fst_dec_t &&fst, snd_dec_t &&snd) {
-        // first is arithmetic type
-        neunet_type_if (neunet_dec_num(fst_dec_t)) return net_decimal {fst} * snd;
-        // second is arithmetic type
-        neunet_type_elif (neunet_dec_num(snd_dec_t)) return fst * net_decimal {snd};
-        // both are decimal
-        neunet_type_else
+    friend net_decimal operator*(const net_decimal &fst, const net_decimal &snd) {
         net_decimal ans;
-        if (fst.dec && snd.dec) {
-            ans.base = dec_mul(ans.sgn, fst.base, fst.sgn, snd.base, snd.sgn);
-            return ans;
-        }
-        if (!dec_is_valid(fst.frac)) fst.frac = dec_init(fst.base, fst.fraction_reduct);
-        if (!dec_is_valid(snd.frac)) snd.frac = dec_init(snd.base, snd.fraction_reduct);
-        ans.dec  = false;
-        ans.frac = dec_mul(ans.sgn, fst.frac, fst.sgn, snd.frac, snd.sgn, false);
+        auto fst_dec = fst.is_dec(),
+             snd_dec = snd.is_dec();
+        ans.num      = dec_mul(ans.sgn, fst.num, fst.sgn, snd.num, snd.sgn);
+        if (fst_dec && snd_dec) return ans;
+        if (fst_dec || snd_dec) 
+            if (fst_dec) ans.den = snd.den;
+            else ans.den = fst.den;
+        else ans.den = dec_mul(fst.den, snd.den);
         return ans;
-        neunet_type_endif
     }
-    callback_dec void operator*=(dec_t &&src) {
-        neunet_type_if (neunet_dec_num(dec_t)) *this = *this * net_decimal {src};
-        neunet_type_else *this = *this * src;
-        neunet_type_endif
-    }
-    callback_dec_arg_ref friend void operator*=(arg &fst, net_decimal &snd) { fst *= snd.to_float(); }
+    void operator*=(const net_decimal &snd) { *this = *this * snd; }
+    callback_dec_arg friend void operator*=(arg &fst, const net_decimal &snd) { fst *= snd.to_float(); }
 
-    callback_dec_s friend net_decimal operator/(fst_dec_t &&divd, snd_dec_t &&divr) {
-        // first is arithmetic type
-        neunet_type_if (neunet_dec_num(fst_dec_t)) return net_decimal {divd} / divr;
-        // second is arithmetic type
-        neunet_type_elif (neunet_dec_num(snd_dec_t)) return divd / net_decimal {divr};
-        // both are decimal
-        neunet_type_else
+    friend net_decimal operator/(const net_decimal &divd, const net_decimal &divr) {
         net_decimal ans;
-        ans.sgn = divr.sgn != divd.sgn;
-        if (divr.is_one()) {
-            ans = divd;
+        auto divd_dec = divd.is_dec(),
+             divr_dec = divr.is_dec();
+        ans.sgn = divd.sgn != divr.sgn;
+        if (divd_dec && divr_dec) {
+            ans.num = divd.num;
+            ans.den = divr.num;
             return ans;
         }
-        ans.dec = false;
-        if (divd.dec && divd.dec) {
-            ans.frac = dec_init(divd.base, divr.base, false);
+        if (divd_dec && !divr_dec) {
+            ans.den = divr.num;
+            ans.num = dec_mul(divd.num, divr.den);
             return ans;
         }
-        if (!dec_is_valid(divd.frac)) divd.frac = dec_init(divd.base, divd.fraction_reduct);
-        if (!dec_is_valid(divr.frac)) divr.frac = dec_init(divr.base, divr.fraction_reduct);
-        ans.frac = dec_div(ans.sgn, divd.frac, divd.sgn, divr.frac, divr.sgn, false);
+        if (!divd_dec && divr_dec) {
+            ans.num = divd.num;
+            ans.den = dec_mul(divd.den, divr.den);
+            return ans;
+        }
+        ans.num = dec_mul(divd.num, divr.den);
+        ans.den = dec_mul(divd.den, divr.num);
         return ans;
-        neunet_type_endif
     }
-    callback_dec void operator/=(dec_t &&divr) {
-        neunet_type_if (neunet_dec_num(dec_t)) *this = *this / net_decimal {divr};
-        neunet_type_else *this = *this / divr;
-        neunet_type_endif
-    }
-    callback_dec_arg_ref friend void operator/=(arg &fst, net_decimal &snd) { fst /= snd.to_float(); }
+    void operator/=(const net_decimal &divr) { *this = *this / divr; }
+    callback_dec_arg friend void operator/=(arg &divd, const net_decimal &divr) { divd *= divr.to_float(); }
 
-    callback_dec_s friend net_decimal operator%(fst_dec_t &&divd, snd_dec_t &&divr) {
-        // first is arithmetic type
-        neunet_type_if (neunet_dec_num(fst_dec_t)) return net_decimal {divd} % divr;
-        // second is arithmetic type
-        neunet_type_elif (neunet_dec_num(snd_dec_t)) return divd % net_decimal {divr};
-        // both are decimal
-        neunet_type_else
-        net_decimal ans;
-        ans.sgn = divd.sgn;
-        if (divd.dec) ans.base = divd.base;
-        else {
-            auto tmp = dec_float_part(ans.base, divd.frac);
-            net_assert(!dec_is_zero(tmp), "net_decimal", "%", "Dividend could not be 0.");
-        }
-        if (divr.dec) {
-            dec_rem(ans.base, divr.base);
-            if (divr.modulus_mode && divd.sgn != divr.sgn) ans.base = dec_add(ans.sgn, ans.base, false, divr.base, divr.sgn);
-        } else {
-            net_decimal_data divr_base;
-            auto tmp = dec_float_part(divr_base, divr.frac);
-            net_assert(!dec_is_zero(tmp), "net_decimal", "%", "Divisor could not be 0.");
-            dec_rem(ans.base, divr_base);
-            if (divr.modulus_mode && divd.sgn != divr.sgn) ans.base = dec_add(ans.sgn, ans.base, false, divr_base, divr.sgn);
-        }
-        return ans;
-        neunet_type_endif
+    friend net_decimal operator%(const net_decimal &divd, const net_decimal &divr) {
+        auto divd_tmp = divd,
+             divr_tmp = divr;
+        return divd_tmp.remainder(divr_tmp);
     }
-    callback_dec void operator%=(dec_t &&divr) {
-        neunet_type_if (neunet_dec_num(dec_t)) *this = *this % net_decimal {divr};
-        neunet_type_else *this = *this % divr;
-        neunet_type_endif
-    }
-    callback_dec_arg_ref friend void operator%=(arg &divd, net_decimal &divr) {
+    void operator%=(const net_decimal &divr) { *this = *this % divr; }
+    callback_dec_arg friend void operator%=(arg &divd, const net_decimal &divr) {
         static_assert(std::is_integral_v<arg>, "Dividend should be an integer.");
-        int64_t divr_tmp {0};
-        if (divr.dec) divr_tmp = dec_to_integer(divr.sgn, divr.base);
-        else divr_tmp = dec_to_integer(divr.sgn, divr.frac);
-        auto divd_sgn = divd < 0;
-        divd %= divr_tmp;
-        if (divr.modulus_mode && divd_sgn != divr.sgn) divd += divr_tmp;
+        net_decimal divr_tmp = divr;
+        remainder(divd, divr_tmp);
     }
-
-    callback_dec_s friend net_decimal operator<<(fst_dec_t &&src, snd_dec_t &&bit) {
-        neunet_type_if (neunet_dec_num(fst_dec_t)) return net_decimal {src} << bit;
-        neunet_type_elif (neunet_dec_num(snd_dec_t)) return src << net_decimal {bit};
-        neunet_type_else
-        net_assert(src.is_integer() && bit.is_integer(), "net_decimal", "<<", "Variables should be ineteger.");
-        net_decimal ans = src;
-        // TODO lsh operation
-        // for (net_decimal i = 0; i < bit; ++i) dec_bit_lsh_one(ans.base);
-        return ans;
-        neunet_type_endif
-    }
-    callback_dec void operator<<=(dec_t &&src) {
-        neunet_type_if (neunet_dec_num(dec_t)) *this = *this << net_decimal {src};
-        neunet_type_else *this = *this << src;
-        neunet_type_endif
-    }
-    callback_dec_arg_ref friend void operator<<=(arg &fst, net_decimal &snd) { fst <<= snd.to_integer(); }
-
-    callback_dec_s friend net_decimal operator>>(fst_dec_t &&src, snd_dec_t &&bit) {
-        neunet_type_if (neunet_dec_num(fst_dec_t)) return net_decimal {src} << bit;
-        neunet_type_elif (neunet_dec_num(snd_dec_t)) return src << net_decimal {bit};
-        neunet_type_else
-        net_assert(src.is_integer() && bit.is_integer(), "net_decimal", ">>", "Variables should be ineteger.");
-        net_decimal ans = src;
-        // TODO rsh operation
-        // for (net_decimal i = 0; i < bit; ++i) dec_bit_rsh_one(ans.base);
-        return ans;
-        neunet_type_endif
-    }
-    callback_dec void operator>>=(dec_t &&src) {
-        neunet_type_if (neunet_dec_num(dec_t)) *this = *this >> net_decimal {src};
-        neunet_type_else *this = *this >> src;
-        neunet_type_endif
-    }
-    callback_dec_arg_ref friend void operator>>=(arg &fst, net_decimal &snd) { fst >>= snd.to_integer(); }
 
     friend std::ostream &operator<<(std::ostream &os, const net_decimal &src) {
-        if (src.sgn) os << '-';
-        if (src.dec) {
-            os << src.base;
+        if (src.sgn && !src.is_zero()) os << '-';
+        if (src.is_dec()) {
+            os << src.num;
             return os;
         }
-        auto tmp = dec_div(src.frac.num, src.frac.den, src.division_precision);
+        auto tmp = dec_div(src.num, src.den, src.division_precision);
         os << tmp;
         return os;
     }
@@ -685,16 +436,16 @@ NEUNET_END
 
 _STD_BEGIN
 
-// neunet::net_decimal abs(const neunet::net_decimal &_Xx) { return _Xx.abs(); }
+neunet::net_decimal abs(const neunet::net_decimal &_Xx) { return _Xx.abs(); }
 
-// callback_dec_ins_s neunet::net_decimal pow(ins_fst &&_Xx, ins_snd &&_Yx) { return _Xx.pow(_Yx); }
+neunet::net_decimal pow(const neunet::net_decimal &_Xx, const neunet::net_decimal &_Yx) { return _Xx.pow( _Yx); }
 
-// callback_dec_ins neunet::net_decimal exp(ins &&_Xx) { return _Xx.exp(); }
+neunet::net_decimal exp(const neunet::net_decimal &_Xx) { return _Xx.exp(); }
 
-// callback_dec_ins neunet::net_decimal log(ins &&_Xx) { return _Xx.ln(); }
+neunet::net_decimal log(const neunet::net_decimal &_Xx) { return _Xx.ln(); }
 
-// callback_dec_ins neunet::net_decimal sin(ins &&_Xx) { return _Xx.sin(); }
+neunet::net_decimal sin(const neunet::net_decimal &_Xx) { return _Xx.sin(); }
 
-// callback_dec_ins neunet::net_decimal cos(ins &&_Xx) { return _Xx.cos(); }
+neunet::net_decimal cos(const neunet::net_decimal &_Xx) { return _Xx.cos(); }
 
 _STD_END

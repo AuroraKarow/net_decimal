@@ -137,7 +137,7 @@ uint64_t dec_div(uint64_t divd_0, uint64_t divd_1, uint64_t divr) {
     */
     uint64_t ans_1 = divd_2 / divr_d + divd_3 * 1. / divr;
     if (cmp) return ans_0 + ans_1;
-    return ans_0 - ans_1 - 1;
+    return ans_0 - ans_1;
 }
 uint64_t dec_div(net_set<uint64_t> &divd, const net_set<uint64_t> &divr, uint64_t &divd_high) {
     net_set<uint64_t> divd_tmp;
@@ -158,10 +158,10 @@ uint64_t dec_div(net_set<uint64_t> &divd, const net_set<uint64_t> &divr, uint64_
          ans_pow = NEUNET_DEC_SEG_MAX;
     while (ans_coe < ans_pow) ans_pow /= 10;
 
-    std::cout << '\n';
-    if (divd_high) std::cout << dec_to_string_seg(divd_high);
-    for (auto i = 0ull; i < divd.length; ++i) std::cout << dec_to_string_seg(divd[i]); std::cout << '\n';
-    std::cout << std::endl;
+    // std::cout << '\n';
+    // if (divd_high) std::cout << dec_to_string_seg(divd_high);
+    // for (auto i = 0ull; i < divd.length; ++i) std::cout << dec_to_string_seg(divd[i]); std::cout << '\n';
+    // std::cout << std::endl;
     
     for (auto i = 0ull; ; ++i) {
         uint64_t carry = 0;
@@ -173,9 +173,9 @@ uint64_t dec_div(net_set<uint64_t> &divd, const net_set<uint64_t> &divr, uint64_
         }
         auto tmp = dec_div_carry(carry, divd[0], divr[0], ans_coe);
 
-        if (tmp) std::cout << dec_to_string_seg(tmp);
-        for (auto i = 0ull; i < divd_tmp.length; ++i) std::cout << dec_to_string_seg(divd_tmp[i]);
-        std::cout << ans_coe;
+        // if (tmp) std::cout << dec_to_string_seg(tmp);
+        // for (auto i = 0ull; i < divd_tmp.length; ++i) std::cout << dec_to_string_seg(divd_tmp[i]);
+        // std::cout << ans_coe;
         
         if (carry <= divd_high) {
             if (ans_pow == 1 || !i) {
@@ -186,14 +186,14 @@ uint64_t dec_div(net_set<uint64_t> &divd, const net_set<uint64_t> &divr, uint64_
             ans_pow /= 10;
         }
         
-        else std::cout << '*';
-        std::cout << '\n';
+        // else std::cout << '*';
+        // std::cout << '\n';
 
         ans_coe -= ans_pow;
     }
     divd = std::move(divd_tmp);
 
-    std::cout << std::endl;
+    // std::cout << std::endl;
 
     return ans_coe;
 }
@@ -374,52 +374,63 @@ int main(int argc, char *argv[], char *envp[]) {
     14657816563.2 / 128 = 114514191.9
     */
 
-    uint64_t divd_it_len = 25,
-             divr_it_len = 3;
-    net_set<uint8_t> divd_coe = {1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 1, 3, 1, 0, 8, 0, 0, 1, 9, 2, 0, 0, 0, 0, 1},
-                     divr_coe = {1, 5, 6};
-    uint64_t dig_cnt = 1,
-             seg_cnt = 300;
-    if (divd_it_len >= divr_it_len) dig_cnt = divd_it_len - divr_it_len + 1;
-    net_set<uint8_t> ans_set(dig_cnt + seg_cnt + 2);
-    uint64_t ans_idx = 0;
-    if (divd_it_len < divr_it_len) ans_idx = divr_it_len - divd_it_len;
-    for (auto i = ans_idx; i < ans_set.length - 2; ++i) {
-        ans_set[i] = dec_div(divd_coe, divr_coe);
-        cout << '[' << (int)ans_set[i] << "][";
-        for (auto tmp : divd_coe) cout << (int)tmp << ' ';
-        cout << "\b]" << endl;
-    }
-    dig_cnt %= NEUNET_DEC_DIG_MAX;
-    if (!dig_cnt) dig_cnt = NEUNET_DEC_DIG_MAX;
-    uint64_t ans = 0;
-    for (auto i = 0ull; i < ans_set.length - 2; ++i) {
-        ans *= 10;
-        ans += ans_set[i];
-        if (--dig_cnt) continue;
-        auto nidx = i + 1;
-        while (ans_set[nidx] < 0) {
-            --ans;
-            ans_set[nidx] += 10;
-        }
-        if (!ans_set[nidx]) {
-            auto carry = 0;
-            while (ans_set[nidx + 1] < 0) {
-                ans_set[nidx + 1] += 10;
-                --carry;
-            }
-            while (carry < 0) {
-                --ans;
-                carry += 10;
-            }
-            ans_set[nidx] = carry;
-        }
-        cout << ans << '|';
-        ans = 0;
-        dig_cnt = NEUNET_DEC_DIG_MAX;
-    }
-    while (dig_cnt--) ans *= 10;
-    cout << ans << endl;
+    // uint64_t divd_it_len = 25,
+    //          divr_it_len = 3;
+    // net_set<uint8_t> divd_coe = {1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 1, 3, 1, 0, 8, 0, 0, 1, 9, 2, 0, 0, 0, 0, 1},
+    //                  divr_coe = {1, 5, 6};
+    // uint64_t dig_cnt = 1,
+    //          seg_cnt = 300;
+    // if (divd_it_len >= divr_it_len) dig_cnt = divd_it_len - divr_it_len + 1;
+    // net_set<uint8_t> ans_set(dig_cnt + seg_cnt + 2);
+    // uint64_t ans_idx = 0;
+    // if (divd_it_len < divr_it_len) ans_idx = divr_it_len - divd_it_len;
+    // for (auto i = ans_idx; i < ans_set.length - 2; ++i) {
+    //     ans_set[i] = dec_div(divd_coe, divr_coe);
+    //     cout << '[' << (int)ans_set[i] << "][";
+    //     for (auto tmp : divd_coe) cout << (int)tmp << ' ';
+    //     cout << "\b]" << endl;
+    // }
+    // dig_cnt %= NEUNET_DEC_DIG_MAX;
+    // if (!dig_cnt) dig_cnt = NEUNET_DEC_DIG_MAX;
+    // uint64_t ans = 0;
+    // for (auto i = 0ull; i < ans_set.length - 2; ++i) {
+    //     ans *= 10;
+    //     ans += ans_set[i];
+    //     if (--dig_cnt) continue;
+    //     auto nidx = i + 1;
+    //     while (ans_set[nidx] < 0) {
+    //         --ans;
+    //         ans_set[nidx] += 10;
+    //     }
+    //     if (!ans_set[nidx]) {
+    //         auto carry = 0;
+    //         while (ans_set[nidx + 1] < 0) {
+    //             ans_set[nidx + 1] += 10;
+    //             --carry;
+    //         }
+    //         while (carry < 0) {
+    //             --ans;
+    //             carry += 10;
+    //         }
+    //         ans_set[nidx] = carry;
+    //     }
+    //     cout << ans << '|';
+    //     ans = 0;
+    //     dig_cnt = NEUNET_DEC_DIG_MAX;
+    // }
+    // while (dig_cnt--) ans *= 10;
+    // cout << ans << endl;
+
+    auto sgn  = false;
+    auto test = dec_init(sgn, "324938271560444852566064687276808488928"),
+         four = dec_init(sgn, 4);
+    cout << dec_div_test(test, four, 0) << endl;
+
+    uint64_t test_round = 10000000;
+    auto test_time = NEUNET_CHRONO_TIME_POINT;
+    for (auto i = 0ull; i < test_round; ++i) dec_div_test(test, four, 0);
+    auto test_end = NEUNET_CHRONO_TIME_POINT;
+    cout << "[normal][" << test_round << "][" << test_end - test_time << "ms]" << std::endl;
 
     cout << '\n' << (NEUNET_CHRONO_TIME_POINT - ch_tm_pt) << "ms" << endl;
     return EXIT_SUCCESS;
