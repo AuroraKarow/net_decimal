@@ -66,6 +66,7 @@ struct net_decimal_data final {
 
 uint64_t dec_dig_cnt(uint64_t seg_last_idx) { return seg_last_idx * NEUNET_DEC_DIG_MAX; }
 uint64_t dec_dig_cnt(const net_decimal_data &src, bool is_it) {
+    if ((is_it && !src.it.length) || !(is_it || src.ft.length)) return 0;
     uint64_t ans = 0,   
              tmp = 0;
     if(is_it){
@@ -601,7 +602,10 @@ net_decimal_data dec_rem(net_decimal_data &divd_rem, const net_decimal_data &div
          div_end  = false;
     auto ans_seg  = dec_div(divd_rem, divr, 0, ans_itsz, ans_sgn, div_end);
     auto ans_quot = dec_div_ans(ans_seg, ans_itsz);
-    if (div_end) divd_rem.it.reset();
+    if (div_end) {
+        divd_rem.reset();
+        return ans_quot;
+    }
     if (ans_sgn) ans_quot = dec_add(ans_quot, dec_init(div_end, 1), true);
     divd_rem = dec_add(divd_rem, dec_mul(ans_quot, divr), true);
     return ans_quot;
@@ -636,33 +640,34 @@ net_decimal_data dec_e10_rsh(const net_decimal_data &src, uint64_t dig_cnt) {
          rem_pow = 1ull,
          seg_pow = 0ull;
     if (rem_dig) {
-        ++seg_dif;
-        while (rem_dig--) rem_pow *= 10;
+        auto tmp = rem_dig;
+        while (tmp--) rem_pow *= 10;
         seg_pow = NEUNET_DEC_SEG_MAX / rem_pow;
     }
-    rem_dig = 0;
-    net_decimal_data ans;
-    ans.ft.init(src.ft.length + seg_dif);
     auto ans_ft_idx = 0;
-    if (src.it.length < seg_dif) {
-        ans_ft_idx = seg_dif - src.it.length - 1;
-        for (auto i = src.it.length; i; --i) {
-            ans.ft[ans_ft_idx] = src.it[i - 1];
-            dec_e10_rsh(ans.ft[ans_ft_idx++], rem_pow, seg_pow, rem_dig);
-        }
-    } else {
-        ans.it.init(src.it.length - seg_dif + 1);
+    net_decimal_data ans;
+    ans.ft.init(src.ft.length + seg_dif + (rem_dig ? 1 : 0));
+    rem_dig = 0;
+    if (src.it.length > seg_dif) {
+        ans.it.init(src.it.length - seg_dif);
         auto src_it_idx = src.it.length;
         for (auto i = ans.it.length; i; --i) {
             auto idx     = i - 1;
             ans.it[idx]  = src.it[--src_it_idx];
             dec_e10_rsh(ans.it[idx], rem_pow, seg_pow, rem_dig);
         }
-        if (!ans.it[ans.it.length - 1]) {
-            if (ans.it.length == 1) ans.it.reset();
-            else ans.it = ans.it.sub_set(0, ans.it.length - 2);
+        seg_dif = ans.it.length - 1;
+        if (!ans.it[seg_dif]) {
+            if (seg_dif--) ans.it = ans.it.sub_set(0, seg_dif);
+            else ans.it.reset();
         }
         for (auto i = src_it_idx; i; --i) {
+            ans.ft[ans_ft_idx] = src.it[i - 1];
+            dec_e10_rsh(ans.ft[ans_ft_idx++], rem_pow, seg_pow, rem_dig);
+        }
+    } else {
+        ans_ft_idx = seg_dif - src.it.length;
+        if (src.it.length) for (auto i = src.it.length; i; --i) {
             ans.ft[ans_ft_idx] = src.it[i - 1];
             dec_e10_rsh(ans.ft[ans_ft_idx++], rem_pow, seg_pow, rem_dig);
         }
@@ -695,32 +700,35 @@ net_decimal_data dec_e10_lsh(const net_decimal_data &src, uint64_t dig_cnt) {
          rem_pow = 0ull,
          seg_pow = 1ull;
     if (rem_dig) {
-        ++seg_dif;
-        while (rem_dig--) seg_pow *= 10;
+        auto tmp = rem_dig;
+        while (tmp--) seg_pow *= 10;
         rem_pow = NEUNET_DEC_SEG_MAX / seg_pow;
     }
-    rem_dig = 0;
-    net_decimal_data ans;
-    ans.it.init(src.it.length + seg_dif);
     auto ans_it_idx = 0ull;
-    if (src.ft.length < seg_dif) if (src.ft.length) for (auto i = src.ft.length; i; --i) {
-        ans.it[ans_it_idx] = src.ft[i - 1];
-        dec_e10_lsh(ans.it[ans_it_idx++], rem_pow, seg_pow, rem_dig);
-    } else ans_it_idx = seg_dif - 1;
-    else {
-        ans.ft.init(src.ft.length - seg_dif + 1);
+    net_decimal_data ans;
+    ans.it.init(src.it.length + seg_dif + (rem_dig ? 1 : 0));
+    rem_dig = 0;
+    if (src.ft.length > seg_dif) {
+        ans.ft.init(src.ft.length - seg_dif);
         auto src_ft_idx = src.ft.length;
         for (auto i = ans.ft.length; i; --i) {
             auto idx    = i - 1;
             ans.ft[idx] = src.ft[--src_ft_idx];
             dec_e10_lsh(ans.ft[idx], rem_pow, seg_pow, rem_dig);
         }
-        if (!ans.ft[ans.ft.length - 1]) {
-            if (ans.ft.length == 1) ans.ft.reset();
-            else ans.ft = ans.ft.sub_set(0, ans.ft.length - 2);
+        seg_dif = ans.ft.length - 1;
+        if (!ans.ft[seg_dif]) {
+            if (seg_dif--) ans.ft = ans.ft.sub_set(0, seg_dif);
+            else ans.ft.reset();
         }
         while (src_ft_idx) {
             ans.it[ans_it_idx] = src.ft[--src_ft_idx];
+            dec_e10_lsh(ans.it[ans_it_idx++], rem_pow, seg_pow, rem_dig);
+        }
+    } else {
+        ans_it_idx = seg_dif - src.ft.length;
+        if (src.ft.length) for (auto i = src.ft.length; i; --i) {
+            ans.it[ans_it_idx] = src.ft[i - 1];
             dec_e10_lsh(ans.it[ans_it_idx++], rem_pow, seg_pow, rem_dig);
         }
     }
@@ -738,61 +746,6 @@ net_decimal_data dec_e10_lsh(const net_decimal_data &src, uint64_t dig_cnt) {
     return ans;
 }
 
-// 11.4514 -> 10000, 114513
-net_decimal_data dec_e10(net_decimal_data &e10, const net_decimal_data &src) {
-    auto sgn = false;
-    if (!src.ft.length) {
-        e10 = dec_init(sgn, 1);
-        return src;
-    }
-    auto it_seg = src.ft;
-    it_seg.reverse();
-    it_seg = it_seg.unit(src.it);
-    /*
-    41534 3607414684000115610.1056011112001114511 000564861
-    41534|3607414684000115610|1056011112001114511|   564861000000000
-    */
-    net_decimal_data ans;
-    auto seg_tmp = it_seg[0],
-         pow_rem = 1ull,
-         e10_seg = src.ft.length;
-    if (seg_tmp % 10) {
-        // mice segment for the multiple of 19
-        e10.it.init(e10_seg + 1);
-        e10.it[e10_seg] = 1;
-        ans.it = std::move(it_seg);
-        return ans;
-    } else e10.it.init(e10_seg--);
-    while (!(seg_tmp % 10)) {
-        // 564861000000000 -> 564861000000000 / 1000000000
-        pow_rem *= 10;
-        seg_tmp /= 10;
-    }
-    auto pow_cnt = NEUNET_DEC_SEG_MAX / pow_rem,
-         end_idx = it_seg.length - 1;
-    /*
-    10000000000000000000
-              1000000000
-     1000000000
-    */
-    for (auto i = 0ull; i < end_idx; ++i) {
-        /*
-        1056011112001114511|   564861000000000
-        564861000000000 / 1000000000 = 564861
-        1056011112001114511 % 1000000000 * 1000000000 = 2001114511000000000
-        2001114511000000000 + 564861 = 2001114511000564861
-        1056011112001114511 / 1000000000 = 105601111
-        105601111 | 2001114511000564861
-        */
-        it_seg[i] /= pow_rem;
-        it_seg[i] += it_seg[i + 1] % pow_rem * pow_cnt;
-    }
-    e10.it[e10_seg]  = pow_cnt;
-    it_seg[end_idx] /= pow_rem;
-    while (!it_seg[end_idx]) --end_idx;
-    ans.it = it_seg.sub_set(0, end_idx);
-    return ans;
-}
 // 5 -> 100000
 net_decimal_data dec_e10(uint64_t e10) {
     net_decimal_data ans;
@@ -812,6 +765,47 @@ net_decimal_data dec_e10(uint64_t e10) {
     for (auto i = 0; i < dig_cnt; ++i) seg_cnt *= 10;
     ans.it[ans.it.length - 1] = seg_cnt;
     return ans;
+}
+/* 100000000000000000000
+ * total == true -> 1 * 100000000000000000000
+ * total == false -> 10 * 10000000000000000000
+ */
+void dec_e10(net_decimal_data &e10, net_decimal_data &src, bool total = false) {
+    e10.reset();
+    e10.it = {1};
+    if (!src.ft.length) goto it_part;
+    src.ft.reverse();
+    if (src.it.length || src.ft[src.ft.length - 1]) src.it = src.ft.unit(src.it);
+    else for (auto i = src.ft.length; i; --i) if (src.ft[i - 1]) {
+        src.it = src.ft.sub_set(0, i - 1);
+        break;
+    }
+    e10.reset();
+    e10.ft.init(src.ft.length);
+    e10.ft[src.ft.length - 1] = 1;
+    src.ft.reset();
+    it_part: if (!src.it.length || src.it[0]) goto total_part;
+    for (auto i = 0ull; i < src.it.length; ++i) if (src.it[i]) {
+        src.it = src.it.sub_set(i, src.it.length - 1);
+        if (i < e10.ft.length) {
+            e10.ft.init(e10.ft.length - i, false);
+            e10.ft[e10.ft.length - 1] = NEUNET_DEC_SEG_MAX / 10;
+        } else {
+            e10.it.init(i - e10.ft.length + 1, false);
+            e10.ft.reset();
+            e10.it[e10.it.length - 1] = 1;
+        }
+        break;
+    }
+    total_part: if (!total || src.it[0] % 10) return;
+    auto seg_tmp = src.it[0],
+         dig_cnt = 0ull;
+    do {
+        seg_tmp /= 10;
+        ++dig_cnt;
+    } while (!(seg_tmp % 10));
+    src = dec_e10_rsh(src, dig_cnt);
+    e10 = dec_e10_lsh(e10, dig_cnt);
 }
 
 void dec_truncate(net_decimal_data &src, uint64_t prec) {

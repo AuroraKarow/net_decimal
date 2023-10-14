@@ -614,22 +614,9 @@ net_decimal_data dec_sin_cos(bool &ans_sgn, const net_decimal_data &src_num, con
     return dec_div(ans_sgn, p, p_sgn, q, false, prec);
 }
 
-bool dec_frac_verify(const net_decimal_data &den) { return !dec_is_zero(den); }
-
 bool dec_frac_is_zero(const net_decimal_data &num, const net_decimal_data &den) { return dec_is_zero(den) && dec_is_zero(num); }
 
 bool dec_frac_is_one(const net_decimal_data &num, const net_decimal_data &den) { return dec_is_zero(den) && dec_is_one(num); }
-
-bool dec_frac_is_int(net_decimal_data &num, net_decimal_data &den) {
-    if (!dec_frac_verify(den)) return dec_is_int(num);
-    if (dec_comp(num, den) == NEUNET_DEC_CMP_LES) return false;
-    auto quot = dec_div(num, den, 1);
-    if (quot.ft.length) return false;
-    den.reset();
-    num.ft.reset();
-    num.it = std::move(quot.it);
-    return true;
-}
 
 long double dec_frac2f(bool sgn, net_decimal_data &num, net_decimal_data &den) { return dec2f(sgn, dec_div(num, den, 2)); }
 
@@ -640,78 +627,192 @@ int64_t dec_frac2i(bool sgn, net_decimal_data &num, net_decimal_data &den) {
 
 int dec_frac_comp(const net_decimal_data &fst_num, const net_decimal_data &fst_den, bool fst_sgn, const net_decimal_data &snd_num, const net_decimal_data &snd_den, bool snd_sgn) {
     if (dec_comp(fst_den, snd_den) == NEUNET_DEC_CMP_EQL) return dec_comp(fst_num, fst_sgn, snd_num, snd_sgn);
-    auto fst_is_frac = dec_frac_verify(fst_den),
-         snd_is_frac = dec_frac_verify(snd_den);
+    auto fst_is_frac = !dec_is_zero(fst_den),
+         snd_is_frac = !dec_is_zero(snd_den);
     if (fst_is_frac && snd_is_frac) return dec_comp(dec_mul(fst_num, snd_den), fst_sgn, dec_mul(snd_num, fst_den), snd_sgn);
     if (fst_is_frac) return dec_comp(fst_num, fst_sgn, dec_mul(snd_num, fst_den), snd_sgn);
     return dec_comp(dec_mul(fst_num, snd_den), fst_sgn, snd_num, snd_sgn);
 }
 
-bool dec_frac_add(net_decimal_data &fst_num, net_decimal_data &fst_den, bool fst_sgn, const net_decimal_data &snd_num, const net_decimal_data &snd_den, bool snd_sgn) {
-    if (dec_frac_is_zero(fst_den, fst_den)) {
-        fst_num = snd_num;
-        fst_den = snd_den;
+bool dec_frac_add(net_decimal_data &ans_num, net_decimal_data &ans_den, const net_decimal_data &fst_num, const net_decimal_data &fst_den, bool fst_sgn, const net_decimal_data &snd_num, const net_decimal_data &snd_den, bool snd_sgn) {
+    if (dec_frac_is_zero(fst_num, fst_den)) {
+        ans_num = snd_num;
+        ans_den = snd_den;
         return snd_sgn;
     }
-    if (dec_frac_is_zero(snd_den, snd_den)) return fst_sgn;
+    if (dec_frac_is_zero(snd_num, snd_den)) {
+        ans_num = fst_num;
+        ans_den = fst_den;
+        return snd_sgn;
+    }
     auto ans_sgn = false;
     if (dec_comp(fst_den, snd_den) == NEUNET_DEC_CMP_EQL) {
-        fst_num = dec_add(ans_sgn, fst_num, fst_sgn, snd_num, snd_sgn);
+        ans_num = dec_add(ans_sgn, fst_num, fst_sgn, snd_num, snd_sgn);
+        ans_den = fst_den;
         return ans_sgn;
     }
-    auto fst_is_frac = dec_frac_verify(fst_den),
-         snd_is_frac = dec_frac_verify(snd_den);
+    auto fst_is_frac = !dec_is_zero(fst_den),
+         snd_is_frac = !dec_is_zero(snd_den);
     if (fst_is_frac && snd_is_frac) {
-        fst_num = dec_add(ans_sgn, dec_mul(fst_num, snd_den), fst_sgn, dec_mul(snd_num, fst_den), snd_sgn);
-        fst_den = dec_mul(fst_den, snd_den);
+        ans_num = dec_add(ans_sgn, dec_mul(fst_num, snd_den), fst_sgn, dec_mul(snd_num, fst_den), snd_sgn);
+        ans_den = dec_mul(fst_den, snd_den);
         return ans_sgn;
     }
     if (fst_is_frac) {
-        fst_num = dec_add(ans_sgn, fst_num, fst_sgn, dec_mul(snd_num, fst_den), snd_sgn);
+        ans_num = dec_add(ans_sgn, fst_num, fst_sgn, dec_mul(snd_num, fst_den), snd_sgn);
+        ans_den = fst_den;
         return ans_sgn;
     }
-    fst_num = dec_add(ans_sgn, dec_mul(fst_num, snd_den), fst_sgn, snd_num, snd_sgn);
-    fst_den = snd_den;
+    ans_num = dec_add(ans_sgn, dec_mul(fst_num, snd_den), fst_sgn, snd_num, snd_sgn);
+    ans_den = snd_den;
     return ans_sgn;
 }
 
-bool dec_frac_sub(net_decimal_data &minu_num, net_decimal_data &minu_den, bool minu_sgn, const net_decimal_data &subt_num, const net_decimal_data &subt_den, bool subt_sgn) {
-    if (dec_frac_is_zero(subt_num, subt_den)) return minu_sgn;
+bool dec_frac_sub(net_decimal_data &ans_num, net_decimal_data &ans_den, const net_decimal_data &minu_num, const net_decimal_data &minu_den, bool minu_sgn, const net_decimal_data &subt_num, const net_decimal_data &subt_den, bool subt_sgn) {
+    if (dec_frac_is_zero(subt_num, subt_den)) {
+        ans_num = minu_num;
+        ans_den = minu_den;
+        return minu_sgn;
+    }
     if (dec_frac_is_zero(minu_num, minu_den)) {
-        minu_num = subt_num;
-        minu_den = subt_den;
+        ans_num = subt_num;
+        ans_den = subt_den;
         return !subt_sgn;
     }
-    return dec_frac_add(minu_num, minu_den, minu_sgn, subt_num, subt_den, !subt_sgn);
+    return dec_frac_add(ans_num, ans_den, minu_num, minu_den, minu_sgn, subt_num, subt_den, !subt_sgn);
 }
 
-bool dec_frac_mul(net_decimal_data &fst_num, net_decimal_data &fst_den, bool fst_sgn, const net_decimal_data &snd_num, const net_decimal_data &snd_den, bool snd_sgn) {
+bool dec_frac_mul(net_decimal_data &ans_num, net_decimal_data &ans_den, const net_decimal_data &fst_num, const net_decimal_data &fst_den, bool fst_sgn, const net_decimal_data &snd_num, const net_decimal_data &snd_den, bool snd_sgn) {
+    if (dec_frac_is_zero(fst_num, fst_den) || dec_frac_is_zero(snd_num, snd_den)) {
+        ans_num.reset();
+        ans_den.reset();
+        return false;
+    }
     auto ans_sgn = fst_sgn != snd_sgn;
-    if (dec_frac_is_one(snd_num, snd_den)) return ans_sgn;
+    if (dec_frac_is_one(snd_num, snd_den)) {
+        ans_num = fst_num;
+        ans_den = fst_den;
+        return ans_sgn;
+    }
     if (dec_frac_is_one(fst_num, fst_den)) {
-        fst_num = snd_num;
-        fst_den = snd_den;
+        ans_num = snd_num;
+        ans_den = snd_den;
         return ans_sgn;
     }
-    auto fst_is_frac = dec_frac_verify(fst_den),
-         snd_is_frac = dec_frac_verify(snd_den);
-    fst_num          = dec_mul(fst_num, snd_num);
+    auto fst_is_frac = !dec_is_zero(fst_den),
+         snd_is_frac = !dec_is_zero(snd_den);
+    ans_num          = dec_mul(fst_num, snd_num);
+    if (!(fst_is_frac || snd_is_frac)) {
+        ans_den.reset();
+        return ans_sgn;
+    }
     if (fst_is_frac && snd_is_frac) {
-        fst_den = dec_mul(fst_den, snd_den);
+        ans_den = dec_mul(fst_den, snd_den);
         return ans_sgn;
     }
-    if (snd_is_frac) fst_den = snd_den;
+    if (snd_is_frac) ans_den = snd_den;
+    else ans_den = fst_den;
     return ans_sgn;
 }
 
-bool dec_frac_div(net_decimal_data &divd_num, net_decimal_data &divd_den, bool divd_sgn, const net_decimal_data &divr_num, const net_decimal_data &divr_den, bool divr_sgn) { return dec_frac_mul(divd_num, divd_den, divd_sgn, divr_den, divr_num, divr_sgn); }
+bool dec_frac_div(net_decimal_data &ans_num, net_decimal_data &ans_den, const net_decimal_data &divd_num, const net_decimal_data &divd_den, bool divd_sgn, const net_decimal_data &divr_num, const net_decimal_data &divr_den, bool divr_sgn) {
+    assert(!dec_is_zero(divr_num));
+    if (dec_frac_is_zero(divd_num, divd_num)) {
+        ans_num.reset();
+        ans_den.reset();
+        return false;
+    }
+    if (dec_frac_is_one(divr_num, divr_den)) {
+        ans_num = divd_num;
+        ans_den = divd_den;
+        return divd_sgn;
+    }
+    if (dec_frac_is_one(divd_num, divd_den)) {
+        ans_num = divr_den;
+        ans_den = divr_num;
+        if (dec_is_zero(ans_num)) ans_num.it = {1};
+        return divr_sgn;
+    }
+    if (dec_is_zero(divd_den) && dec_is_zero(divr_den)) {
+        ans_num = divd_num;
+        ans_den = divr_num;
+        return divd_sgn != divr_sgn;
+    }
+    if (dec_is_zero(divr_den)) {
+        auto sgn = false;
+        return dec_frac_mul(ans_num, ans_den, divd_num, divd_den, divd_sgn, dec_init(sgn, 1), divr_num, divr_sgn);
+    }
+    return dec_frac_mul(ans_num, ans_den, divd_num, divd_den, divd_sgn, divr_den, divr_num, divr_sgn);
+}
 
-void dec_frac0(net_decimal_data &num, net_decimal_data &den) { if (dec_is_zero(num)) den.reset(); }
+// return quotient, unsigned
+net_decimal_data dec_frac_rem(net_decimal_data &ans_num, net_decimal_data &ans_den, const net_decimal_data &divd_num, const net_decimal_data &divd_den, const net_decimal_data &divr_num, const net_decimal_data &divr_den) {
+    dec_frac_div(ans_num, ans_den, divd_num, divd_den, false, divr_num, divr_den, false);
+    auto ans = dec_rem(ans_num, ans_den);
+    ans_den.reset();
+    if (dec_is_zero(divd_den) && dec_is_zero(divr_den)) return ans;
+    if (!(dec_is_zero(divd_den) || dec_is_zero(divr_den))) {
+        ans_num = dec_div(ans_num, dec_mul(divd_den, divr_den), 0);
+        return ans;
+    }
+    if (dec_is_zero(divd_den)) {
+        ans_num = dec_div(ans_num, divr_den, 0);
+        return ans;
+    }
+    ans_num = dec_div(ans_num, divd_den, 0);
+    return ans;
+}
 
-void dec_frac1(net_decimal_data &num, net_decimal_data &den) { if (dec_comp(num, den) == NEUNET_DEC_CMP_EQL) {
+bool dec_frac0(net_decimal_data &num, net_decimal_data &den) { if (dec_is_zero(num)) {
+    den.reset();
+    return true;
+} return false; }
+
+bool dec_frac1(net_decimal_data &num, net_decimal_data &den) { if (!dec_is_zero(num) && dec_comp(num, den) == NEUNET_DEC_CMP_EQL) {
     den.reset();
     num.reset();
     num.it = {1};
-} }
+    return true;
+} return false; }
+
+void dec_frac_norm(net_decimal_data &num, net_decimal_data &den, bool total = false) {
+    if (!(num.ft.length || den.ft.length)) return;
+    auto lsh_cnt = 0ull;
+    if (total) lsh_cnt = (std::max)(dec_dig_cnt(num, false), dec_dig_cnt(den, false));
+    else lsh_cnt = (std::max)(den.ft.length, num.ft.length) * NEUNET_DEC_DIG_MAX;
+    num = dec_e10_lsh(num, lsh_cnt);
+    den = dec_e10_lsh(den, lsh_cnt);
+}
+
+void dec_frac_red(net_decimal_data &num, net_decimal_data &den) {
+    if (dec_is_zero(den)) return;
+    // dec_frac_norm(num, den, true);
+    auto fst = num,
+         snd = den;
+    auto gcd = dec_gcd(fst, snd);
+    if (gcd) {
+        num = dec_div(num, snd, 0);
+        den = dec_div(den, snd, 0);
+    } else {
+        num = dec_div(num, fst, 0);
+        den = dec_div(den, fst, 0);
+    }
+    if (dec_is_one(den)) den.reset();
+}
+
+net_decimal_data dec_frac_int_part(net_decimal_data &num, net_decimal_data &den) {
+    if (!dec_is_zero(den)) return dec_rem(num, den);
+    net_decimal_data ans;
+    num = dec_float_part(ans, num);
+    return ans;
+}
+
+bool dec_frac_bit_verify(net_decimal_data &ans, const net_decimal_data &num, const net_decimal_data &den) {
+    if (dec_is_zero(den) && num.ft.length) return false;
+    auto tmp = num;
+    ans      = dec_rem(tmp, den);
+    if (!dec_is_zero(tmp)) return false;
+    return true;
+}
 
 NEUNET_END

@@ -29,6 +29,10 @@
 #define NEUNET_DEC_CMP_LES          0x0001
 #define NEUNET_DEC_CMP_GTR          0x0002
 
+#define NEUNET_DEC_BIN_OR           0x0000
+#define NEUNET_DEC_BIN_AND          0x0001
+#define NEUNET_DEC_BIN_XOR          0x0002
+
 #define neunet_t_arr_len(type, arg) type[sizeof(arg) / sizeof(type)]
 
 #define neunet_dec_init_expr        std::is_arithmetic_v<arg> ||\

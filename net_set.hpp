@@ -223,7 +223,10 @@ public:
     void reset() { len = 0; ptr_reset(ptr); }
     
     arg &operator[](uint64_t idx) const {
+        // FIXME: performance lost
+        #if neunet_boundary_check
         if (idx >= len) return neunet_null_ref(arg);
+        #endif
         return *(ptr + idx);
     }
 

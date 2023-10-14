@@ -4,6 +4,8 @@
 
 #pragma once
 
+#define neunet_boundary_check 1
+
 #include <iostream>
 #include <fstream>
 #include "net_decimal"
@@ -20,10 +22,20 @@ int main(int argc, char *argv[], char *envp[]) {
     cout << "hello, world.\n" << endl;
     auto ch_tm_pt = NEUNET_CHRONO_TIME_POINT;
     
-    auto sgn  = false;
-    auto divd = dec_init(sgn, "11030597389278466836225822482490"),
-         divr = dec_init(sgn, "9632515584713416829");
-    cout << dec_div(divd, divr, 128) << endl;
+    // auto sgn  = false;
+    // auto divd = dec_init(sgn, "1651516516641654951811416849849811514"),
+    //      divr = dec_init(sgn, "0.0000000000000000000000516511651654848");
+    // dec_frac_red(divd, divr);
+    // cout << divd << endl;
+    // cout << divr << endl;
+
+    auto ans = 176.145_d / 113.2_d;
+    cout << double(ans) << endl;
+
+    auto fst = 1445_d / 85_d, snd = 22_d;
+    cout << (fst | snd) << endl;
+    cout << (17 | 22) << endl;
+    cout << fst.absolute << endl;
 
     cout << '\n' << (NEUNET_CHRONO_TIME_POINT - ch_tm_pt) << "ms" << endl;
     return EXIT_SUCCESS;

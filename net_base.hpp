@@ -4,9 +4,7 @@ NEUNET_BEGIN
 
 callback_arg arg *ptr_init(uint64_t len) {
     if (len == 0) return nullptr;
-    auto ans = new arg [len];
-    if constexpr (std::is_copy_assignable_v<arg>) std::fill_n(ans, len, arg{});
-    else for (auto i = 0ull; i < len; ++i) *(ans + i) = arg{};
+    auto ans = new arg [len](arg{});
     return ans;
 }
 
