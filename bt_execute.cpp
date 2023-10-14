@@ -7,109 +7,112 @@
 using namespace neunet;
 #define NEUNET_CHRONO_TIME_POINT    std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now()).time_since_epoch().count()
 
+// void dec_bit_lsh_one(net_decimal_data &D, bool sta = false){
+//     if (dec_dig_cnt(D, false) || !dec_dig_cnt(D, true) || (!(dec_dig_cnt(D, true) - 1) && D.it[0] == 0)) return;
+//     if (!sta && D.it[D.it.length - 1] >= NEUNET_DEC_BIT_BAS) D.it.init(D.it.length + 1);
+//     int t = 0;
+//     for(uint64_t m = 0; m < D.it.length; m++) if(D.it[m] >= NEUNET_DEC_BIT_BAS) {
+//         D.it[m] -= NEUNET_DEC_BIT_BAS;
+//         D.it[m] <<= 1;
+//         D.it[m] += t;
+//         t = 1;
+//     } else {
+//         D.it[m] <<= 1;
+//         D.it[m] += t;
+//         t = 0;
+//     }
+// }
 
-void dec_bit_lsh_one(net_decimal_data &D){
-    uint64_t k1 = NEUNET_DEC_BIT_BAS, k = 1;
-    k <<= 63;
-    if (dec_dig_cnt(D, false)) return;
-    if (D.it[D.it.length - 1] >= k) {
-        D.it[D.it.length - 1] -= k;
-        D.it.init(D.it.length + 1);
-        D.it[D.it.length - 1] += k;
-        int t = 0;
-        for(uint64_t m = 0; m < D.it.length - 1; m++) if(D.it[m] >= k1) { 
-            D.it[m] -= k1;
-            D.it[m] <<= 1;
-            D.it[m] += t;
-            t = 1;
-        } else {
-            D.it[m] <<= 1;
-            D.it[m] += t;
-            t = 0;
-        }
-        return;
-    }
-    int t = 0;
-    for(uint64_t m = 0; m < D.it.length; m++) if(D.it[m] >= k1) { 
-        D.it[m]  -= k1;
-        D.it[m] <<= 1;
-        D.it[m]  += t;
-        t = 1;
-    } else {
-        D.it[m] <<= 1;
-        D.it[m]  += t;
-        t = 0;
-    }
-    if (!t) return;
-    D.it.init(D.it.length + 1);
-    D.it[D.it.length - 1]++;
-    // std::cout << "dec_lt" << std::endl;
-}
-
-void dec_bit_rsh_one(net_decimal_data &D){
-    uint64_t k0 = 0, k1 = NEUNET_DEC_BIT_BAS, k = 1;
-    k <<= 63;
-    if (dec_dig_cnt(D, false)) return;
-    if(D.it[D.it.length - 1] >= k){
-        D.it[D.it.length - 1] -= k;
-        uint64_t t = 0;
-        for(uint64_t m = D.it.length; m > 0; m--) if(D.it[m - 1] % 2 == 1){ 
-            D.it[m - 1] >>= 1;
-            D.it[m - 1] += t;
-            t = k1;
-        } else{
-            D.it[m - 1] >>= 1;
-            D.it[m - 1] += t;
-            t = 0;
-        }
-        if(D.it[D.it.length - 1] > 0) D.it.init(D.it.length + 1);
-        D.it[D.it.length - 1] += k;
-        return;
-    }
-    uint64_t t = 0;
-    for(uint64_t m = D.it.length; m > 0; m--) if(D.it[m - 1] % 2 == 1){ 
-        D.it[m - 1] >>= 1;
-        D.it[m - 1] += t;
-        t = k1;
-    } else {
-        D.it[m - 1] >>= 1;
-        D.it[m - 1] += t;
-        t = 0;
-    }
-    if(!D.it[D.it.length - 1]) D.it.init(D.it.length - 1, true);
-    // std::cout << "dec_rt" << std::endl;
-}
-
-uint64_t rev0(uint64_t &d){
-    uint64_t dn = 0;
-    for(uint64_t k = 0; k < 64; k++){ 
-        uint64_t a = 1, b = 1;
-        if(d & (a << k)){ dn += b << (63 - k); } 
-    }
-    d = dn;
-    return d;
-}
-
-void dec_lt_move(net_decimal_data &D, int64_t B){ while(B--){ dec_bit_lsh_one(D); } }
-
-void dec_rt_move(net_decimal_data &D, int64_t B){ while(B--){ dec_bit_rsh_one(D); } }
+// void dec_bit_rsh_one(net_decimal_data &D, bool sta = false){
+//     uint64_t k1 = NEUNET_DEC_BIT_BAS;
+//     if (dec_dig_cnt(D, false) || !dec_dig_cnt(D, true) || (!(dec_dig_cnt(D, true) - 1) && D.it[0] == 0)) return;
+//     uint64_t t = 0;
+//     for(uint64_t m = D.it.length; m > 0; m--) if(D.it[m - 1] % 2 == 1){ 
+//         D.it[m - 1] >>= 1;
+//         D.it[m - 1] += t;
+//         t = k1;
+//     } else{
+//         D.it[m - 1] >>= 1;
+//         D.it[m - 1] += t;
+//         t = 0;
+//     }
+//     if (!sta && !D.it[D.it.length - 1]) D.it.length - 1 ? D.it[D.it.length - 2] < NEUNET_DEC_BIT_TOP ? D.it.init(D.it.length - 1, true) : D.it.init(D.it.length, true) : D.it.init(D.it.length - 1, true);
+// }
 
 // kp
 net_decimal_data dec_bit_k0(bool sgn = false) { return dec_init(sgn, 0); }
 // k, k1
 net_decimal_data dec_bit_k1(bool sgn = false) { return dec_init(sgn, 1); }
 
-net_decimal_data dec_bit_and(const net_decimal_data &fst, const net_decimal_data &snd, bool sgn = false) {
+uint64_t dec_bit_cnt(net_decimal_data &D){
+    uint64_t b = 0;
+    auto K = D,
+         k = dec_bit_k0();
+    while(dec_comp(k, K) != NEUNET_DEC_CMP_EQL){ 
+        dec_bit_rsh_one(K);
+        b++;
+    }
+    return b;
+}
+
+void dec_bit_not(net_decimal_data &src, bool comple = false, uint64_t bit = 0, bool sgn = false) {
+    /*
+    src = 50(110010)；
+    comple = false, bit = 0, sgn=true,  return 77(1001101);
+    comple = true,  bit = 0, sgn=true,  return 50(110010);
+    comple = false, bit = 0, sgn=false, return 13(1101);
+    comple = false, bit = 0, sgn=false, return 78(-50(1001110));
+    comple = false, bit = 9, sgn=false, return 526(-50(1000001110));
+    */
+    auto k0 = dec_bit_k0(),
+         k1 = dec_bit_k1(),
+         k  = k0,
+         K  = k1;
+    auto b  = 0;
+    auto k_sgn = false;
+    if (dec_comp(src, k0) == NEUNET_DEC_CMP_EQL && !bit) { src = std::move(k1); return; }
+    if (comple && sgn) return;
+    while(dec_comp(src, k0) != NEUNET_DEC_CMP_EQL || b < bit){
+        if(dec_dig_cnt(src, true) || !(src.it.length - 1) && src.it[0] != 0) if (!(src.it[0] % 2)) k = dec_add(k_sgn, k, true, k1, true);
+        dec_bit_lsh_one(k1);
+        dec_bit_rsh_one(src);
+        b++;
+    }
+    if (comple) {
+        k = dec_add(k_sgn, k, true, K, true);
+        if (!sgn) { if (dec_comp(k, k1) != NEUNET_DEC_CMP_LES) { dec_bit_lsh_one(k1); } k = dec_add(k_sgn, k, true, k1, true); }
+    } else if (sgn) k = dec_add(k_sgn, k, true, k1, true);
+    /*
+    while(dec_comp(D1, k0) != NEUNET_DEC_CMP_EQL){
+        if(!(D1.it[0] % 2)){ k = dec_add(sgn, k, sgn, kp, sgn); }
+        dec_bit_lsh_one(kp);
+        dec_bit_rsh_one(D1);
+    }
+    */
+    src = std::move(k);
+}
+
+net_decimal_data dec_bit_and(const net_decimal_data &fst, const net_decimal_data &snd, bool fst_sgn = false, bool snd_sgn = false, uint64_t bit = 0) {
     auto D  = fst,
          d  = snd,
          k0 = dec_bit_k0(),
          k1 = dec_bit_k1(),
          k  = k0;
-    while(dec_comp(d, k0) != NEUNET_DEC_CMP_EQL && dec_comp(D, k0) != NEUNET_DEC_CMP_EQL){
-        if(D.it[0] % 2 && d.it[0] % 2) k = dec_add(sgn, k, sgn, k1, sgn);
+    auto b  = 0;
+    auto k_sgn = false;
+    if (!bit) {
+        auto a = dec_bit_cnt(D),
+             b = dec_bit_cnt(d);
+        bit = a > b ? a : b;
+    }
+    if (!fst_sgn) dec_bit_not(D, true, bit);
+    if (!snd_sgn) dec_bit_not(d, true, bit);
+    while(dec_comp(d, k0) != NEUNET_DEC_CMP_EQL || dec_comp(D, k0) != NEUNET_DEC_CMP_EQL || b < bit){
+        if (!(!dec_dig_cnt(D, true) || !dec_dig_cnt(d, true))) if (D.it[0] % 2 && d.it[0] % 2) k = dec_add(k_sgn, k, true, k1, true);
         dec_bit_lsh_one(k1);
         dec_bit_rsh_one(D);
         dec_bit_rsh_one(d);
+        b++;
     }
     /*
     while(dec_comp(d1, k0) != NEUNET_DEC_CMP_EQL && dec_comp(D1, k0) != NEUNET_DEC_CMP_EQL){
@@ -122,17 +125,29 @@ net_decimal_data dec_bit_and(const net_decimal_data &fst, const net_decimal_data
     return k;
 }
 
-net_decimal_data dec_bit_or(const net_decimal_data &fst, const net_decimal_data &snd, bool sgn = false) {
+net_decimal_data dec_bit_or(const net_decimal_data &fst, const net_decimal_data &snd, bool fst_sgn = false, bool snd_sgn = false, uint64_t bit = 0) {
     auto D  = fst,
          d  = snd,
          k0 = dec_bit_k0(),
          k1 = dec_bit_k1(),
          k  = k0;
-    while(dec_comp(d, k0) != NEUNET_DEC_CMP_EQL && dec_comp(D, k0) != NEUNET_DEC_CMP_EQL){
-        if((D.it[0] % 2) || (d.it[0] % 2)) k = dec_add(sgn, k, sgn, k1, sgn);
+    auto b  = 0;
+    auto k_sgn = false;
+    if (!bit) {
+        auto a = dec_bit_cnt(D),
+             b = dec_bit_cnt(d);
+        bit = a > b ? a : b;
+    }
+    if (!fst_sgn) dec_bit_not(D, true, bit);
+    if (!snd_sgn) dec_bit_not(d, true, bit);
+    while(dec_comp(d, k0) != NEUNET_DEC_CMP_EQL || dec_comp(D, k0) != NEUNET_DEC_CMP_EQL || b < bit){
+        if (!(!dec_dig_cnt(D, true) || !dec_dig_cnt(d, true))) { if((D.it[0] % 2) || (d.it[0] % 2)) k = dec_add(k_sgn, k, true, k1, true); }
+        else if (!dec_dig_cnt(D, true)) { if (d.it[0] % 2) k = dec_add(k_sgn, k, true, k1, true); }
+        else if (!dec_dig_cnt(d, true)) { if (D.it[0] % 2) k = dec_add(k_sgn, k, true, k1, true); }
         dec_bit_lsh_one(k1);
         dec_bit_rsh_one(D);
         dec_bit_rsh_one(d);
+        b++;
     }
     /*
     while(dec_comp(d1, k0) != NEUNET_DEC_CMP_EQL && dec_comp(D1, k0) != NEUNET_DEC_CMP_EQL){
@@ -145,36 +160,37 @@ net_decimal_data dec_bit_or(const net_decimal_data &fst, const net_decimal_data 
     return k;
 }
 
-void dec_bit_not(net_decimal_data &src, bool sgn = false) {
-    auto k0 = dec_bit_k0(),
-         k1 = dec_bit_k1(),
-         k  = k0;
-    while(dec_comp(src, k0) != NEUNET_DEC_CMP_EQL){
-        if(!(src.it[0] % 2)) k = dec_add(sgn, k, sgn, k1, sgn);
-        dec_bit_lsh_one(k1);
-        dec_bit_rsh_one(src);
-    }
-    /*
-    while(dec_comp(D1, k0) != NEUNET_DEC_CMP_EQL){
-        if(!(D1.it[0] % 2)){ k = dec_add(sgn, k, sgn, kp, sgn); }
-        dec_bit_lsh_one(kp);
-        dec_bit_rsh_one(D1);
-    }
-    */
-    src = std::move(k);
-}
+// net_decimal_data dec_rad_min(net_decimal_data &src, uint64_t bit = 0, bool sgn = true){
+//     if (dec_comp(dec_bit_k0(), src) == NEUNET_DEC_CMP_EQL) return src;
+//     auto S = src;
+//     if (S.it[S.it.length - 1] >= NEUNET_DEC_BIT_TOP) S.it.init(S.it.length + 1);
+//     if (!sgn) dec_bit_not(S, sgn, bit);
+//     return S;
+// }
 
-net_decimal_data dec_bit_xor(const net_decimal_data &fst, const net_decimal_data &snd, bool sgn = false) {
+net_decimal_data dec_bit_xor(const net_decimal_data &fst, const net_decimal_data &snd, bool fst_sgn = false, bool snd_sgn = false, uint64_t bit = 0) {
     auto k0 = dec_bit_k0(),
          k1 = dec_bit_k1(),
          k  = k0,
          D  = fst,
          d  = snd;
-    while(dec_comp(d, k0) != NEUNET_DEC_CMP_EQL && dec_comp(D, k0) != NEUNET_DEC_CMP_EQL){
-        if((D.it[0] % 2 && !(d.it[0] % 2)) || (!(D.it[0] % 2) && d.it[0] % 2)) k = dec_add(sgn, k, sgn, k1, sgn);
+    auto b  = 0;
+    auto k_sgn = false;
+    if (!bit) {
+        auto a = dec_bit_cnt(D),
+             b = dec_bit_cnt(d);
+        bit = a > b ? a : b;
+    }
+    if (!fst_sgn) dec_bit_not(D, true, bit);
+    if (!snd_sgn) dec_bit_not(d, true, bit);
+    while(dec_comp(d, k0) != NEUNET_DEC_CMP_EQL || dec_comp(D, k0) != NEUNET_DEC_CMP_EQL || b < bit){
+        if (!(!dec_dig_cnt(D, true) || !dec_dig_cnt(d, true))) { if((D.it[0] % 2 && !(d.it[0] % 2)) || (!(D.it[0] % 2) && d.it[0] % 2)) k = dec_add(k_sgn, k, true, k1, true); }
+        else if (!dec_dig_cnt(D, true)) { if (d.it[0] % 2) k = dec_add(k_sgn, k, true, k1, true); }
+        else if (!dec_dig_cnt(d, true)) { if (D.it[0] % 2) k = dec_add(k_sgn, k, true, k1, true); }
         dec_bit_lsh_one(k1);
         dec_bit_rsh_one(D);
         dec_bit_rsh_one(d);
+        b++;
     }
     /*
     while(dec_comp(d1, k0) != NEUNET_DEC_CMP_EQL && dec_comp(D1, k0) != NEUNET_DEC_CMP_EQL){
@@ -231,6 +247,59 @@ net_decimal_data dec_exec_bit(const int type, const net_decimal_data &D, const n
     return k;
 }
 
+// bool dec_bit_lsh_one0(net_decimal_data &D, bool sgn = true){
+//     if (dec_dig_cnt(D, false)) return sgn;
+//     //if () D.it[D.it.length - 1] += k;
+//     return sgn;
+// }
+
+// bool dec_bit_rsh_one0(net_decimal_data &D, bool sgn = true){
+//     uint64_t k0 = 0, k1 = NEUNET_DEC_BIT_BAS;
+//     if (dec_dig_cnt(D, false)) return sgn;
+//     if(D.it[D.it.length - 1] >= NEUNET_DEC_BIT_TOP){
+//         D.it[D.it.length - 1] -= NEUNET_DEC_BIT_TOP;
+//         uint64_t t = 0;
+//         for(uint64_t m = D.it.length; m > 0; m--) if(D.it[m - 1] % 2 == 1){ 
+//             D.it[m - 1] >>= 1;
+//             D.it[m - 1] += t;
+//             t = k1;
+//         } else{
+//             D.it[m - 1] >>= 1;
+//             D.it[m - 1] += t;
+//             t = 0;
+//         }
+//         if(D.it[D.it.length - 1] > 0) D.it.init(D.it.length + 1);
+//         D.it[D.it.length - 1] += NEUNET_DEC_BIT_TOP;
+//         return sgn;
+//     }
+//     uint64_t t = 0;
+//     for(uint64_t m = D.it.length; m > 0; m--) if(D.it[m - 1] % 2 == 1){ 
+//         D.it[m - 1] >>= 1;
+//         D.it[m - 1] += t;
+//         t = k1;
+//     } else {
+//         D.it[m - 1] >>= 1;
+//         D.it[m - 1] += t;
+//         t = 0;
+//     }
+//     if(!D.it[D.it.length - 1]) D.it.init(D.it.length - 1, true);
+//     // std::cout << "dec_rt" << std::endl;
+// }
+
+uint64_t rev0(uint64_t &d){
+    uint64_t dn = 0;
+    for(uint64_t k = 0; k < 64; k++){ 
+        uint64_t a = 1, b = 1;
+        if(d & (a << k)){ dn += b << (63 - k); } 
+    }
+    d = dn;
+    return d;
+}
+
+void dec_lt_move(net_decimal_data &D, int64_t B){ while(B--){ dec_bit_lsh_one(D); } }
+
+void dec_rt_move(net_decimal_data &D, int64_t B){ while(B--){ dec_bit_rsh_one(D); } }
+
 
 
 // void rev1(uint64_t &d){
@@ -246,7 +315,7 @@ net_decimal_data dec_exec_bit(const int type, const net_decimal_data &D, const n
 //     net_decimal_data d = D;
 //     for(uint64_t i = 0; i < D.it.length; i++){ D.it[D.it.length - i - 1] = rev0(d.it[i]); }
 // }
-
+ 
 // void dec_rev_exec2(net_decimal_data &D){
 //     for(uint64_t i = 0; i < D.it)
 // }
@@ -269,7 +338,9 @@ void main(){
     // auto k0 = dec_init(k_sgn, "190000000000000000019000000000000000001900000000000000000120000000000000000019");
     auto k0 = dec_init(k_sgn, "1"),
         k1 = dec_init(k_sgn, "10000000000000000000000000000000000000"),
-        k2 = dec_init(k_sgn, "160");
+        k2 = dec_init(k_sgn, "160"),
+        k3 = dec_init(k_sgn, "206"),//11001110 / 306 / 100110010
+        k4 = dec_init(k_sgn, "61");//00111101 / 451 / 111000011
 
     // auto start = NEUNET_CHRONO_TIME_POINT;
     // auto ds_rev = rev(64);
@@ -277,20 +348,46 @@ void main(){
 	// auto end = NEUNET_CHRONO_TIME_POINT;
 	// std::cout << "Time0: " << end - start << std::endl;
 	// std::cout << dec_to_string(k_sgn, k0) << std::endl;
+    auto K = k1, K1 = dec_bit_k1(), K2 = dec_bit_k1();
+    dec_bit_lsh_one(K1);
+	std::cout << "<<: " << dec_to_string(k_sgn, K1) << std::endl;
+    dec_bit_rsh_one(K1, 1);
+	std::cout << ">>: " << dec_to_string(k_sgn, K1) << std::endl;
+    dec_lt_move(K1, 63);
+	std::cout << "63: " << dec_to_string(k_sgn, K1) << std::endl;
+    dec_lt_move(K1, 1);
+	std::cout << "64: " << dec_to_string(k_sgn, K1) << std::endl;
+    dec_rt_move(K1, 63);
+	std::cout << "1: " << dec_to_string(k_sgn, K1) << std::endl;
 
-    auto start = NEUNET_CHRONO_TIME_POINT;
-	for(int a = 0;a < 1000000;a++){
-        dec_lt_move(k1, 2);
-        dec_rt_move(k1, 2); 
-    }
-	auto end = NEUNET_CHRONO_TIME_POINT;
-	std::cout << "Time: " << end - start << std::endl;
+    // auto start = NEUNET_CHRONO_TIME_POINT;
+	// for(int a = 0;a < 1000000;a++){
+    //     dec_lt_move(k1, 2);
+    //     dec_rt_move(k1, 2); 
+    // }
+	// auto end = NEUNET_CHRONO_TIME_POINT;
+	// std::cout << "Time: " << end - start << std::endl;
 	// std::cout << k1.it << std::endl;
 	//std::cout << "Tell: " << dec_to_string(k_sgn, k1 / k0) << std::endl;
-    auto K = k2;
     dec_bit_not(K);
 	std::cout << k1.it << std::endl;
 	std::cout << k2.it << std::endl;
 	std::cout << dec_to_string(k_sgn, K) << std::endl;
+    dec_lt_move(K2, 123);
+    // for(int a = 120; a < 128; a++){
+    //     dec_bit_lsh_one(K2);
+    // 	std::cout << dec_to_string(k_sgn, K2) << std::endl;
+    // 	// std::cout << K2.it << std::endl;
+    // }
+	std::cout << dec_to_string(k_sgn, k1) << std::endl;
+	std::cout << dec_to_string(k_sgn, K2) << std::endl;
+    // dec_bit_not(k3);
+    auto k001 = dec_bit_and(k3, k4);
+	std::cout << "3: " << dec_to_string(k_sgn, k3) << std::endl;
+    // dec_bit_not(k4, true);
+	std::cout << "4: " << dec_to_string(k_sgn, k4) << std::endl;
+	std::cout << "k_ans: " << dec_to_string(k_sgn, k001) << std::endl;
+    std::cout << "k_ans: " << k001 << std::endl;
+    // 10111:23 101001:41
 }
 

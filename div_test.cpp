@@ -19,6 +19,44 @@ int main(int argc, char *argv[], char *envp[]) {
     cout << "hello, world.\n" << endl;
     auto ch_tm_pt = NEUNET_CHRONO_TIME_POINT;
 
+    // 114679544494614864124.4184414 9913644494614864424.411416186156441646
+    // 1135147821456932545178 9632515584713416829 117.84541758316865039744481535232
+    // 114079544040094610408604012404100840414.00009900130640449040000000800644024400114106186156
+    
+    // auto s = false;
+    // auto a = dec_init(s, "1135147821456932545178"),
+    //      b = dec_init(s,    "9632515584713416829");
+    // auto c = dec_rem(a, b);
+    // cout << dec_to_string(false, c) << endl;
+    // cout << dec_to_string(false, a) << endl;
+    // auto c = dec_gcd(a, b);
+    // if (c) cout << dec_to_string(false, b) << endl;
+    // else cout << dec_to_string(false, a) << endl;
+
+    // net_decimal::division_precision = 130;
+    // auto pi_val = net_decimal::pi();
+    // cout << pi_val << endl;
+
+    // uint64_t test_round = 1000000;
+    // auto test_time = NEUNET_CHRONO_TIME_POINT;
+    // for (auto i = 0ull; i < test_round; ++i) auto c = dec_mul(a, b);
+    // auto test_end = NEUNET_CHRONO_TIME_POINT;
+    // cout << "[normal][" << test_round << "][" << test_end - test_time << "ms]" << std::endl;
+    // test_time = NEUNET_CHRONO_TIME_POINT;
+    // for (auto i = 0ull; i < test_round; ++i) auto c = dec_fft_mul(a, b);
+    // test_end = NEUNET_CHRONO_TIME_POINT;
+    // cout << "[fft][" << test_round << "][" << test_end - test_time << "ms]" << std::endl;
+
+    // net_decimal a {-15},
+    //             b {-7};
+    // b.modulus = true;
+    // auto c = 15;
+    // c %= b;
+    // cout << c << endl;
+
+    // net_decimal::division_precision = 64;
+    // cout << ("1.35"_d).sin() << endl;
+
     /*
     1101001000131080019200001.00010400002170800400005100
     3179 / 256 = 12.41796875
@@ -30,12 +68,12 @@ int main(int argc, char *argv[], char *envp[]) {
 
     uint64_t divd_it_len = 25,
              divr_it_len = 3;
-    net_set<int8_t> divd_coe = {1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 1, 3, 1, 0, 8, 0, 0, 1, 9, 2, 0, 0, 0, 0, 1};
-    net_set<uint8_t> divr_coe = {1, 5, 6};
+    net_set<uint8_t> divd_coe = {1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 1, 3, 1, 0, 8, 0, 0, 1, 9, 2, 0, 0, 0, 0, 1},
+                     divr_coe = {1, 5, 6};
     uint64_t dig_cnt = 1,
              seg_cnt = 300;
     if (divd_it_len >= divr_it_len) dig_cnt = divd_it_len - divr_it_len + 1;
-    net_set<int8_t> ans_set(dig_cnt + seg_cnt + 2);
+    net_set<uint8_t> ans_set(dig_cnt + seg_cnt + 2);
     uint64_t ans_idx = 0;
     if (divd_it_len < divr_it_len) ans_idx = divr_it_len - divd_it_len;
     for (auto i = ans_idx; i < ans_set.length - 2; ++i) {

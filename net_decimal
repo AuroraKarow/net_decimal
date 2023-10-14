@@ -10,21 +10,26 @@
 
 #include "net_set"
 
-#define NEUNET_DEC_SEG_MAX  0x8ac7230489e80000
+#define NEUNET_DEC_SEG_MAX          0x8ac7230489e80000
 
-#define NEUNET_DEC_MUL_POW  0x000f4240ull
-#define NEUNET_DEC_MUL_SQR  (NEUNET_DEC_MUL_POW * NEUNET_DEC_MUL_POW)
-#define NEUNET_DEC_MUL_CUB  (NEUNET_DEC_MUL_SQR * NEUNET_DEC_MUL_POW)
-#define NEUNET_DEC_MUL_END  (NEUNET_DEC_MUL_POW * 0x000a)
+#define NEUNET_DEC_MUL_POW          0x000f4240ull
+#define NEUNET_DEC_MUL_SQR          (NEUNET_DEC_MUL_POW * NEUNET_DEC_MUL_POW)
+#define NEUNET_DEC_MUL_CUB          (NEUNET_DEC_MUL_SQR * NEUNET_DEC_MUL_POW)
+#define NEUNET_DEC_MUL_END          (NEUNET_DEC_MUL_POW * 0x000a)
 
-#define NEUNET_DEC_BIT_BAS  0x4563918244f40000
+#define NEUNET_DEC_DIV_REM          0x3b9aca00ull
 
-#define NEUNET_DEC_DIG_MAX  0x0013
-#define NEUNET_DEC_VLD_DIG  0x0010
+#define NEUNET_DEC_BIT_BAS          0x4563918244f40000
+#define NEUNET_DEC_BIT_TOP          0x8000000000000000
 
-#define NEUNET_DEC_CMP_EQL  0x0000
-#define NEUNET_DEC_CMP_LES  0x0001
-#define NEUNET_DEC_CMP_GTR  0x0002
+#define NEUNET_DEC_DIG_MAX          0x0013
+#define NEUNET_DEC_VLD_DIG          0x0010
+
+#define NEUNET_DEC_CMP_EQL          0x0000
+#define NEUNET_DEC_CMP_LES          0x0001
+#define NEUNET_DEC_CMP_GTR          0x0002
+
+#define neunet_dec_loop             while (true)
 
 #define neunet_t_arr_len(type, arg) type[sizeof(arg) / sizeof(type)]
 
@@ -77,7 +82,8 @@
 #define callback_dec_arg_ref        template<typename arg,\
                                              typename neunet_dec_enable\
                                              (std::is_arithmetic_v<arg>)>
-
+#include "net_decimal_data.hpp"
+#include "net_decimal_frac.hpp"
 #include "net_decimal.hpp"
 
 #endif
