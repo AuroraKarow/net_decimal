@@ -480,6 +480,7 @@ int dec_div_comp(const net_set<uint64_t> &fst, const net_set<uint64_t> &snd, uin
 
 // divd_high = 0, divd_sgn = false, ans_sgn = false, ans_seg_idx = 0, end = false
 uint64_t dec_div_coe(net_set<uint64_t> &divd_seg, const net_set<uint64_t> &divr_seg, uint64_t &divd_high, uint64_t &ans_seg_idx, bool &divd_sgn, bool &ans_sgn, bool &div_end) {
+    ans_sgn = divd_sgn;
     if (!divd_high && divd_seg[0] < divr_seg[0]) {
         divd_high = divd_seg[0];
         for (auto i = 0ull; i < divd_seg.length - 1; ++i) divd_seg[i] = divd_seg[i + 1];
@@ -487,9 +488,9 @@ uint64_t dec_div_coe(net_set<uint64_t> &divd_seg, const net_set<uint64_t> &divr_
         ++ans_seg_idx;
         return 0;
     }
-    auto ans   = dec_div(divd_high, divd_seg[0], divr_seg[0]),
-         carry = 0ull;
+    auto ans = dec_div(divd_high, divd_seg[0], divr_seg[0]);
     net_set<uint64_t> prod_divr_ans(divr_seg.length);
+    auto carry = 0ull;
     for (auto i = divr_seg.length; i; --i) {
         auto idx           = i - 1,
              mul_carry     = carry;
@@ -497,7 +498,6 @@ uint64_t dec_div_coe(net_set<uint64_t> &divd_seg, const net_set<uint64_t> &divr_
         prod_divr_ans[idx] = dec_add(add_carry, dec_mul(carry, ans, divr_seg[idx]), mul_carry);
         if (add_carry) ++carry;
     }
-    ans_sgn  = divd_sgn;
     auto cmp = dec_div_comp(prod_divr_ans, divd_seg, carry, divd_high);
     if (cmp == NEUNET_DEC_CMP_EQL) {
         div_end = true;
@@ -607,7 +607,7 @@ net_decimal_data dec_rem(net_decimal_data &divd_rem, const net_decimal_data &div
         divd_rem.reset();
         return ans_quot;
     }
-    if (ans_sgn) ans_quot = dec_add(ans_quot, dec_init(div_end, 1), true);
+    if (ans_sgn && !dec_is_one(ans_quot)) ans_quot = dec_add(ans_quot, dec_init(div_end, 1), true);
     divd_rem = dec_add(divd_rem, dec_mul(ans_quot, divr), true);
     return ans_quot;
 }

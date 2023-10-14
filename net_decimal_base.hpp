@@ -742,7 +742,8 @@ net_decimal_data dec_ln(bool &ans_sgn, const net_decimal_data &src, uint64_t pre
     return dec_add(ans_sgn, ans, ans_sgn, dec_mul(cnt, net_decimal_ln4::value(prec)), false);
 }
 
-net_decimal_data dec_exp(bool &ans_sgn, const net_decimal_data &src_num, const net_decimal_data &src_den,  bool src_sgn, uint64_t prec) {
+
+net_decimal_data dec_exp(bool &ans_sgn, const net_decimal_data &src_num, const net_decimal_data &src_den, bool src_sgn, uint64_t prec) {
     auto num_form = src_num,
          den_form = src_den;
     dec_frac_red(num_form, den_form);
@@ -755,7 +756,7 @@ net_decimal_data dec_exp(bool &ans_sgn, const net_decimal_data &src_num, const n
         num_form = dec_mul(num_form, hlf);
         ++cnt;
     }
-    prec *= cnt;
+    prec         *= cnt;
 
     auto prec_seg = prec / NEUNET_DEC_DIG_MAX,
          prec_rem = prec % NEUNET_DEC_DIG_MAX;
