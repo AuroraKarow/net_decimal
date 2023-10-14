@@ -8,10 +8,7 @@
 #ifndef __NET_DECIMAL__
 #define __NET_DECIMAL__
 
-#include <complex>
 #include "net_set"
-
-#define NEUNET_DEC_PI       3.1415926535897932
 
 #define NEUNET_DEC_SEG_MAX  0x8ac7230489e80000
 
@@ -19,6 +16,8 @@
 #define NEUNET_DEC_MUL_SQR  (NEUNET_DEC_MUL_POW * NEUNET_DEC_MUL_POW)
 #define NEUNET_DEC_MUL_CUB  (NEUNET_DEC_MUL_SQR * NEUNET_DEC_MUL_POW)
 #define NEUNET_DEC_MUL_END  (NEUNET_DEC_MUL_POW * 0x000a)
+
+#define NEUNET_DEC_BIT_BAS  0x4563918244f40000
 
 #define NEUNET_DEC_DIG_MAX  0x0013
 #define NEUNET_DEC_VLD_DIG  0x0010
@@ -80,16 +79,5 @@
                                              (std::is_arithmetic_v<arg>)>
 
 #include "net_decimal.hpp"
-
-NEUNET_BEGIN
-
-std::atomic_uint64_t net_decimal::division_precision = 32;
-std::atomic_bool     net_decimal::fraction_reduct    = false;
-
-net_decimal operator "" _d(const char *src, uint64_t len) { return net_decimal(std::string(src)); }
-net_decimal operator "" _d(long double src) { return net_decimal(src); }
-net_decimal operator "" _d(uint64_t src) { return net_decimal(src); }
-
-NEUNET_END
 
 #endif

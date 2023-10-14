@@ -92,13 +92,11 @@ int main(int argc, char *argv[], char *envp[]) {
     // c %= b;
     // cout << c << endl;
 
-    net_decimal::division_precision = 64;
-    cout << ("1.35"_d).sin() << endl;
+    // net_decimal::division_precision = 64;
+    // cout << ("1.35"_d).sin() << endl;
 
-    // net_decimal::fft_mode = true;
-    // net_decimal a = -0.216,
-    //             b = 1 / 3_d;
-    // cout << a.dec_pow(b) << endl;
+    auto test = "-0.216"_d.pow(1 / 3_d);
+    cout << test << endl;
 
     cout << '\n' << (NEUNET_CHRONO_TIME_POINT - ch_tm_pt) << "ms" << endl;
     return EXIT_SUCCESS;
