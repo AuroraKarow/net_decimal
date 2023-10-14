@@ -339,7 +339,7 @@ protected:
 public:
 };
 
-net_decimal operator""_d(const char *src, uint64_t len) { return net_decimal(std::string(src)); }
+net_decimal operator""_d(const char *src, size_t len) { return net_decimal(std::string(src)); }
 net_decimal operator""_d(long double src) { return net_decimal(src); }
 net_decimal operator""_d(uint64_t src) { return net_decimal(src); }
 

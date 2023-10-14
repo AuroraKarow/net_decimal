@@ -464,8 +464,8 @@ ch_str str_stream_in(uint64_t buffer_len = 1e5) {
 }
 
 ch_str *str_split(uint64_t &len, const ch_str src, const char syb) {
-    auto cnt     = 0ull,
-         src_len = std::strlen(src);
+    auto cnt     = 0ull;
+    auto src_len = std::strlen(src);
     auto ans     = ptr_init<ch_str>(src_len);
          len     = 0;
     while (*(src + cnt) != '\0') {
@@ -482,20 +482,20 @@ ch_str *str_split(uint64_t &len, const ch_str src, const char syb) {
 
 ch_str str_charset_exchange(const wch_str src)
 {
-    auto len     = std::wcslen(src),
-         buf_len = 0ull;
+    auto len     = std::wcslen(src);
+    auto buf_len = 0ull;
     auto ans     = ptr_init<char>(len + 1);
-    wcstombs_s(&buf_len, ans, len + 1, src, len);
+    wcstombs_s((size_t*)&buf_len, ans, len + 1, src, len);
     *(ans + len) = '\0';
     return ans;
 }
 wch_str str_charset_exchange(const ch_str src)
 {
     // setlocale(LC_ALL, "zh_CN.UTF-8");
-    auto len     = std::strlen(src),
-         buf_len = 0ull;
+    auto len     = std::strlen(src);
+    auto buf_len = 0ull;
     auto ans     = ptr_init<wchar_t>(len + 1);
-    mbstowcs_s(&buf_len, ans, len + 1, src, len);
+    mbstowcs_s((size_t*)&buf_len, ans, len + 1, src, len);
     *(ans + len) = L'\0';
     return ans;
 }

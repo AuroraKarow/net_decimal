@@ -362,258 +362,6 @@ net_decimal_data dec_bit_xor(const net_decimal_data &fst, const net_decimal_data
     return k;
 }
 
-// NOT thread safety
-class {
-private:
-    net_set<net_decimal_data> prec;
-    
-public:
-    net_decimal_data get(uint64_t precision) {
-        if (!precision) return dec_e10(0);
-        --precision;
-        if (precision >= prec.length) {
-            auto len = prec.length;
-            if (!len) len = 128;
-            while (len < precision) len <<= 1;
-            prec.init(len);
-        }
-        if (dec_is_zero(prec[precision])) prec[precision] = dec_e10(precision + 1);
-        return prec[precision];
-    }
-
-} net_decimal_prec;
-
-// NOT thread safety
-class {
-private:
-    net_decimal_data b,
-                     c,
-                     s,
-                     o,
-                     p,
-                     q,
-                     a;
-
-    bool need_init = true;
-
-    uint64_t prec = 0;
-
-public:
-    net_decimal_data get(uint64_t precision) {
-        if (precision <= prec) return a;
-        prec = precision;
-        if (need_init) {
-            need_init = false;
-            auto sgn  = false;
-            b = dec_init(sgn, 1);
-            c = dec_init(sgn, 2);
-            s = dec_init(sgn, "0.6");
-            o = dec_init(sgn, "0.36");
-            q = b;
-        }
-        net_decimal_data d;
-        do {
-            if (dec_comp(b, q) == NEUNET_DEC_CMP_EQL) p = dec_add(p, s);
-            else {
-                p = dec_add(dec_mul(b, p), dec_mul(s, q));
-                q = dec_mul(q, b);
-            }
-            s = dec_mul(s, o);
-            b = dec_add(b, c);
-            d = dec_e10_lsh(s, precision + 2);
-        } while (dec_comp(d, b) == NEUNET_DEC_CMP_GTR);
-        a = dec_mul(c, dec_div(p, q, prec));
-        return a;
-    }
-
-} net_decimal_ln4;
-
-// NOT thread safety
-class {
-private:
-    bool on  = false,
-         sgn = false;
-
-    std::atomic_uint64_t prec = 0;
-
-    net_decimal_data p, q,
-                     // +2
-                     a,
-                     // +4
-                     b, 
-                     // +8
-                     c, d,
-                     o, s,
-                     dec_2,
-                     dec_4,
-                     dec_8;
-    
-    void init() {
-        if (on) return;
-        p = dec_init(sgn, 0);
-        q = dec_init(sgn, 1);
-        a = dec_init(sgn, 0.25);
-        b = dec_init(sgn, 2);
-        c = dec_init(sgn, 5);
-        d = dec_init(sgn, 6);
-        o = dec_init(sgn, 0.0625);
-        s = q;
-        dec_2 = dec_init(sgn, 2);
-        dec_4 = dec_init(sgn, 4);
-        dec_8 = dec_init(sgn, 8);
-        on = true;
-    }
-
-    void run(uint64_t precision) { while (prec < precision) {
-        init();
-        auto u = dec_init(sgn, 1),
-             v = a;
-        u = dec_add(dec_mul(b, u), v, true);
-        v = dec_mul(v, b);
-        u = dec_add(dec_mul(c, u), v, true);
-        v = dec_mul(v, c);
-        u = dec_add(dec_mul(d, u), v, true);
-        v = dec_mul(v, d);
-        u = dec_mul(u, s);
-        if (dec_comp(q, v) == NEUNET_DEC_CMP_EQL) p = dec_add(p, u);
-        else {
-            p = dec_add(dec_mul(v, p), dec_mul(u, q));
-            q = dec_mul(v, q);
-        }
-        s = dec_mul(s, o);
-        a = dec_add(a, dec_2);
-        b = dec_add(b, dec_4);
-        c = dec_add(c, dec_8);
-        d = dec_add(d, dec_8);
-        ++prec;
-    } }
-
-public:
-    net_decimal_data get(uint64_t precision) {
-        run(precision);
-        return dec_div(p, q, precision);
-    }
-
-} net_decimal_pi;
-
-// 0 < src <= 2
-net_decimal_data dec_ln_2(bool &ans_sgn, const net_decimal_data &src, uint64_t prec) {
-    auto p_sgn = false,
-         x_sgn = false,
-         c_sgn = false;
-    auto b = dec_init(p_sgn, 1),
-         p = dec_init(p_sgn, 0),
-         i = b,
-         q = b,
-         c = b,
-         x = dec_sub(x_sgn, src, false, b, false),
-         o = x,
-         d = p;
-    auto o_sgn = x_sgn;
-    do {
-        if (dec_comp(b, q) == NEUNET_DEC_CMP_EQL) p = dec_add(p_sgn, p, p_sgn, x, x_sgn);
-        else {
-            auto fst_sgn = false,
-                 snd_sgn = false;
-            auto fst = dec_mul(fst_sgn, b, false, p, p_sgn),
-                 snd = dec_mul(snd_sgn, c, c_sgn, x, x_sgn);
-            snd = dec_mul(snd_sgn, snd, snd_sgn, q, false);
-            p   = dec_add(p_sgn, fst, fst_sgn, snd, snd_sgn);
-            q   = dec_mul(q, b);
-        }
-        x = dec_mul(x_sgn, x, x_sgn, o, o_sgn);
-        b = dec_add(b, i);
-        c_sgn = !c_sgn;
-        d = dec_e10_lsh(x, prec + 2);
-    } while (dec_comp(d, b) == NEUNET_DEC_CMP_GTR);
-    return dec_div(ans_sgn, p, p_sgn, q, false, prec);
-}
-
-net_decimal_data dec_ln(bool &ans_sgn, const net_decimal_data &src, uint64_t prec) {
-    net_decimal_data cnt,
-                     one = dec_init(ans_sgn, 1);
-    auto cmp = dec_comp(src, one);
-    if (cmp == NEUNET_DEC_CMP_EQL) return cnt;
-    if (cmp == NEUNET_DEC_CMP_LES) return dec_ln_2(ans_sgn, src, prec);
-    net_decimal_data base = src,
-                     ofhs = dec_init(ans_sgn, 0.25);
-    while (dec_comp(base, one) == NEUNET_DEC_CMP_GTR) {
-        base = dec_mul(base, ofhs);
-        cnt  = dec_add(cnt, one);
-    }
-    auto cnt_sgn = false;
-    cnt  = dec_mul(cnt_sgn, cnt, false, net_decimal_ln4.get(prec), false);
-    base = dec_ln_2(ans_sgn, base, prec);
-    return dec_add(ans_sgn, base, ans_sgn, cnt, cnt_sgn);
-}
-
-net_decimal_data dec_exp(bool &ans_sgn, const net_decimal_data &src_num, const net_decimal_data &src_den,  bool src_sgn, uint64_t prec) {
-    auto c = dec_init(ans_sgn, 1),
-         p = c,
-         q = c,
-         o = c,
-         u = src_num,
-         v = src_den,
-         d = dec_init(ans_sgn, 0);
-    auto p_sgn = false,
-         u_sgn = src_sgn,
-         s_dec = dec_comp(src_den, d) == NEUNET_DEC_CMP_EQL;
-    if (s_dec) v = c;
-    do {
-        if (dec_comp(q, v) == NEUNET_DEC_CMP_EQL) p = dec_add(p_sgn, p, p_sgn, u, u_sgn);
-        else {
-            auto fst_sgn = false,
-                 snd_sgn = false;
-            auto fst = dec_mul(fst_sgn, v, false, p, p_sgn),
-                 snd = dec_mul(snd_sgn, u, u_sgn, q, false);
-            p = dec_add(p_sgn, fst, fst_sgn, snd, snd_sgn);
-            q = dec_mul(q, v);
-        }
-        c = dec_add(c, o);
-        u = dec_mul(u_sgn, u, u_sgn, src_num, src_sgn);
-        if (s_dec) v = dec_mul(v, c);
-        else v = dec_mul(v, dec_mul(c, src_den));
-        d = dec_e10_lsh(u, prec + 2);
-    } while (dec_comp(d, v) == NEUNET_DEC_CMP_GTR);
-    return dec_div(ans_sgn, p, p_sgn, q, false, prec);
-}
-
-net_decimal_data dec_sin_cos(bool &ans_sgn, const net_decimal_data &src_num, const net_decimal_data &src_den, bool src_sgn, net_decimal_data &u, net_decimal_data &v, net_decimal_data &b, uint64_t prec) {
-    auto p_sgn = false,
-         u_sgn = false,
-         m_sgn = false,
-         c_sgn = false;
-    auto c = dec_init(ans_sgn, 1),
-         q = c,
-         p = dec_init(ans_sgn, 0),
-         m = dec_mul(m_sgn, src_num, src_sgn, src_num, src_sgn),
-         n = c,
-         d = p;
-    auto frac = dec_comp(src_den, d) != NEUNET_DEC_CMP_EQL;
-    if (frac) n = dec_mul(src_den, src_den);
-    else v = c;
-    do {
-        auto t_sgn = false;
-        auto t     = dec_mul(t_sgn, c, c_sgn, u, u_sgn);
-        if (dec_comp(q, v) == NEUNET_DEC_CMP_EQL) p = dec_add(p_sgn, p, p_sgn, t, t_sgn);
-        else {
-            p = dec_mul(p_sgn, v, false, p, p_sgn);
-            t = dec_mul(t_sgn, t, t_sgn, q, false);
-            p = dec_add(p_sgn, p, p_sgn, t, t_sgn);
-            q = dec_mul(q, v);
-        }
-        u = dec_mul(u_sgn, u, u_sgn, m, m_sgn);
-        if (frac) v = dec_mul(v, n);
-        for (auto i = 0; i < 2; ++i) {
-            b = dec_add(b, c);
-            v = dec_mul(v, b);
-        }
-        c_sgn = !c_sgn;
-        d = dec_e10_lsh(u, prec + 2);
-    } while (dec_comp(d, v) == NEUNET_DEC_CMP_GTR);
-    return dec_div(ans_sgn, p, p_sgn, q, false, prec);
-}
-
 bool dec_frac_is_zero(const net_decimal_data &num, const net_decimal_data &den) { return dec_is_zero(den) && dec_is_zero(num); }
 
 bool dec_frac_is_one(const net_decimal_data &num, const net_decimal_data &den) { return dec_is_zero(den) && dec_is_one(num); }
@@ -813,6 +561,271 @@ bool dec_frac_bit_verify(net_decimal_data &ans, const net_decimal_data &num, con
     ans      = dec_rem(tmp, den);
     if (!dec_is_zero(tmp)) return false;
     return true;
+}
+
+bool dec_series_check(const net_decimal_data &divd, const net_decimal_data &divr, uint64_t prec_seg, uint64_t prec_rem) {
+    if (divd.it.length >= divr.it.length) return true;
+    if (divd.it.length) {
+        if (divr.it.length - divd.it.length - 1 < prec_seg) return true;
+        return (NEUNET_DEC_DIG_MAX - std::log10(divd.it[divd.it.length - 1]) - 1) < prec_rem;
+    }
+    auto seg_cnt = 0ull;
+    while (!divd.ft[seg_cnt]) ++seg_cnt;
+    if (seg_cnt < prec_seg) return true;
+    return (NEUNET_DEC_DIG_MAX - std::log10(divd.ft[seg_cnt]) - 1) < prec_rem;
+}
+
+// NOT thread safety
+struct net_decimal_prec {
+private: inline static net_set<net_decimal_data> prec {};
+
+public: static net_decimal_data value(uint64_t precision) {
+    if (!precision) return dec_e10(0);
+    --precision;
+    if (precision >= prec.length) {
+        auto len = prec.length;
+        if (!len) len = 128;
+        while (len < precision) len <<= 1;
+        prec.init(len);
+    }
+    if (dec_is_zero(prec[precision])) prec[precision] = dec_e10(precision + 1);
+    return prec[precision];
+}
+};
+
+// NOT thread safety
+struct net_decimal_pi {
+private:
+    inline static bool on  = false,
+                       sgn = false;
+
+    inline static std::atomic_uint64_t prec = 0;
+
+    inline static net_decimal_data p, q, a, // +2
+                                   b,       // +4
+                                   c, d,    // +8
+                                   o, s, dec_2, dec_4, dec_8;
+    
+    static void init() {
+        if (on) return;
+        p = dec_init(sgn, 0);
+        q = dec_init(sgn, 1);
+        a = dec_init(sgn, 0.25);
+        b = dec_init(sgn, 2);
+        c = dec_init(sgn, 5);
+        d = dec_init(sgn, 6);
+        o = dec_init(sgn, 0.0625);
+        s = q;
+        dec_2 = dec_init(sgn, 2);
+        dec_4 = dec_init(sgn, 4);
+        dec_8 = dec_init(sgn, 8);
+        on = true;
+    }
+
+    static void run(uint64_t precision) { while (prec < precision) {
+        init();
+        auto u = dec_init(sgn, 1),
+             v = a;
+        u = dec_add(dec_mul(b, u), v, true);
+        v = dec_mul(v, b);
+        u = dec_add(dec_mul(c, u), v, true);
+        v = dec_mul(v, c);
+        u = dec_add(dec_mul(d, u), v, true);
+        v = dec_mul(v, d);
+        u = dec_mul(u, s);
+        if (dec_comp(q, v) == NEUNET_DEC_CMP_EQL) p = dec_add(p, u);
+        else {
+            p = dec_add(dec_mul(v, p), dec_mul(u, q));
+            q = dec_mul(v, q);
+        }
+        s = dec_mul(s, o);
+        a = dec_add(a, dec_2);
+        b = dec_add(b, dec_4);
+        c = dec_add(c, dec_8);
+        d = dec_add(d, dec_8);
+        ++prec;
+    } }
+
+public: static net_decimal_data value(uint64_t precision) {
+    run(precision);
+    return dec_div(p, q, precision);
+}
+};
+
+// NOT thread safety
+struct net_decimal_ln4 {
+private:
+    inline static bool sgn = false;
+
+    inline static uint64_t prec = 0;
+
+    inline static net_decimal_data num_form = dec_init(sgn, "0.36"),
+                                   den_form = dec_init(sgn, "2"),
+                                   num_term = dec_init(sgn, "0.6"),
+                                   den_term = dec_init(sgn, "1"),
+                                   
+                                   den = den_term,
+                                   num,
+                                   ans;
+
+public: static net_decimal_data value(uint64_t precision) {
+    if (precision <= prec) return ans;
+    // auto iter_cnt = 0ull;
+    auto prec_seg = precision / NEUNET_DEC_DIG_MAX,
+         preg_rem = precision % NEUNET_DEC_DIG_MAX;
+    do {
+        if (dec_comp(den, den_term) == NEUNET_DEC_CMP_EQL) num = dec_add(num, num_term);
+        else {
+            num = dec_add(dec_mul(den_term, num), dec_mul(num_term, den));
+            den = dec_mul(den, den_term);
+        }
+        // ++iter_cnt;
+        num_term = dec_mul(num_term, num_form);
+        den_term = dec_add(den_term, den_form);
+    } while (dec_series_check(num_term, den_term, prec_seg, preg_rem));
+    prec = precision;
+    ans  = dec_mul(den_form, dec_div(num, den, prec));
+    // std::cout << "next ln4 - " << iter_cnt << std::endl;
+    return ans;
+}
+};
+
+net_decimal_data dec_ln_2(bool &ans_sgn, const net_decimal_data &src, uint64_t prec) {
+    // auto iter_cnt = 0ull;
+    auto prec_seg = prec / NEUNET_DEC_DIG_MAX,
+         prec_rem = prec % NEUNET_DEC_DIG_MAX;
+
+    auto form_sgn = false,
+         term_sgn = false,
+         coef_sgn = false;
+
+    auto den_form = dec_init(ans_sgn, "1"),
+         num_form = dec_sub(form_sgn, src, false, den_form, false),
+         den_term = den_form,
+         num_term = num_form,
+         
+         num = dec_init(ans_sgn, 0),
+         den = den_form;
+    term_sgn = form_sgn;
+
+    do {
+        if (dec_comp(den, den_term) == NEUNET_DEC_CMP_EQL) num = dec_add(ans_sgn, num, ans_sgn, num_term, term_sgn);
+        else {
+            auto sgn = false;
+            auto fst = dec_mul(sgn, num, false, den_term, false),
+                 snd = dec_mul(sgn, num_term, false, den, false);
+            num      = dec_add(ans_sgn, fst, ans_sgn, snd, term_sgn != coef_sgn);
+            den      = dec_mul(den, den_term);
+        }
+        num_term = dec_mul(term_sgn, num_term, term_sgn, num_form, form_sgn);
+        den_term = dec_add(den_term, den_form);
+        coef_sgn = !coef_sgn;
+        // ++iter_cnt;
+    } while (dec_series_check(num_term, den_term, prec_seg, prec_rem));
+    // std::cout << "next ln2 - " << iter_cnt << std::endl;
+    return dec_div(ans_sgn, num, ans_sgn, den, false, prec);
+}
+
+net_decimal_data dec_ln(bool &ans_sgn, const net_decimal_data &src, uint64_t prec) {
+    auto one = dec_init(ans_sgn, 1);
+    auto cmp = dec_comp(src, one);
+    if (cmp == NEUNET_DEC_CMP_EQL) return {};
+    if (cmp == NEUNET_DEC_CMP_LES) return dec_ln_2(ans_sgn, src, prec);
+    auto ans = src,
+         cnt = dec_init(ans_sgn, 0),
+         ofs = dec_init(ans_sgn, 0.25);
+    while (dec_comp(ans, one) == NEUNET_DEC_CMP_GTR) {
+        ans = dec_mul(ans, ofs);
+        cnt = dec_add(cnt, one);
+    }
+    ans = dec_ln_2(ans_sgn, ans, prec);
+    return dec_add(ans_sgn, ans, ans_sgn, dec_mul(cnt, net_decimal_ln4::value(prec)), false);
+}
+
+net_decimal_data dec_exp(bool &ans_sgn, const net_decimal_data &src_num, const net_decimal_data &src_den,  bool src_sgn, uint64_t prec) {
+    auto num_form = src_num,
+         den_form = src_den;
+    dec_frac_red(num_form, den_form);
+    
+    auto two = dec_init(ans_sgn, 2),
+         hlf = dec_init(ans_sgn, 0.5),
+         ten = dec_init(ans_sgn, 10);
+    auto cnt = 0;
+    while (dec_comp(num_form, ten) == NEUNET_DEC_CMP_GTR) {
+        num_form = dec_mul(num_form, hlf);
+        ++cnt;
+    }
+    prec *= cnt;
+
+    auto prec_seg = prec / NEUNET_DEC_DIG_MAX,
+         prec_rem = prec % NEUNET_DEC_DIG_MAX;
+    auto num_term = num_form,
+         den_term = den_form,
+         fra_term = dec_init(ans_sgn, 1),
+         frac_cnt = fra_term,
+         one_stat = fra_term;
+    auto term_sgn = src_sgn;
+    if (dec_is_zero(src_den)) {
+        den_form = one_stat;
+        den_term = one_stat;
+    }
+    auto num = one_stat,
+         den = one_stat,
+         tmp = dec_init(ans_sgn, 0);
+    do {
+        tmp = dec_mul(den_term, fra_term);
+        if (dec_comp(den, tmp) == NEUNET_DEC_CMP_EQL) num = dec_add(ans_sgn, num, ans_sgn, num_term, term_sgn);
+        else {
+            num = dec_add(ans_sgn, dec_mul(num, tmp), ans_sgn, dec_mul(num_term, den), term_sgn);
+            den = dec_mul(den, tmp);
+        }
+        frac_cnt = dec_add(frac_cnt, one_stat);
+        fra_term = dec_mul(fra_term, frac_cnt);
+        num_term = dec_mul(term_sgn, num_term, term_sgn, num_form, src_sgn);
+        den_term = dec_mul(den_term, den_form);
+    } while (dec_series_check(num_term, tmp, prec_seg, prec_rem));
+    auto ans = dec_div(ans_sgn, num, ans_sgn, den, false, prec);
+    
+    for (auto i = 0; i < cnt; ++i) ans = dec_mul(ans, ans);
+    dec_truncate(ans, 32);
+
+    return ans;
+}
+
+net_decimal_data dec_sin_cos(bool &ans_sgn, const net_decimal_data &src_num, const net_decimal_data &src_den, bool src_sgn, net_decimal_data &u, net_decimal_data &v, net_decimal_data &b, uint64_t prec) {
+    auto p_sgn = false,
+         u_sgn = false,
+         m_sgn = false,
+         c_sgn = false;
+    auto c = dec_init(ans_sgn, 1),
+         q = c,
+         p = dec_init(ans_sgn, 0),
+         m = dec_mul(m_sgn, src_num, src_sgn, src_num, src_sgn),
+         n = c,
+         d = p;
+    auto frac = dec_comp(src_den, d) != NEUNET_DEC_CMP_EQL;
+    if (frac) n = dec_mul(src_den, src_den);
+    else v = c;
+    do {
+        auto t_sgn = false;
+        auto t     = dec_mul(t_sgn, c, c_sgn, u, u_sgn);
+        if (dec_comp(q, v) == NEUNET_DEC_CMP_EQL) p = dec_add(p_sgn, p, p_sgn, t, t_sgn);
+        else {
+            p = dec_mul(p_sgn, v, false, p, p_sgn);
+            t = dec_mul(t_sgn, t, t_sgn, q, false);
+            p = dec_add(p_sgn, p, p_sgn, t, t_sgn);
+            q = dec_mul(q, v);
+        }
+        u = dec_mul(u_sgn, u, u_sgn, m, m_sgn);
+        if (frac) v = dec_mul(v, n);
+        for (auto i = 0; i < 2; ++i) {
+            b = dec_add(b, c);
+            v = dec_mul(v, b);
+        }
+        c_sgn = !c_sgn;
+        d = dec_e10_lsh(u, prec + 2);
+    } while (dec_comp(d, v) == NEUNET_DEC_CMP_GTR);
+    return dec_div(ans_sgn, p, p_sgn, q, false, prec);
 }
 
 NEUNET_END

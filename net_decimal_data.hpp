@@ -91,6 +91,7 @@ bool dec_is_one(const net_decimal_data &src) { return !src.ft.length && src.it.l
 
 net_decimal_data dec_init(bool &sgn, long double src) {
     sgn = src < 0;
+    if (!src) return {};
     src = std::abs(src);
     net_decimal_data ans;
     auto it_seg = (uint64_t)src;
@@ -112,7 +113,7 @@ net_decimal_data dec_init(bool &sgn, long double src) {
 }
 net_decimal_data dec_init(bool &sgn, const std::string &src) {
     // verify
-    auto str_len  = src.length(),
+    auto str_len  = (uint64_t)src.length(),
          dot_idx  = str_len,
          bgn_idx  = 0ull,
          end_idx  = dot_idx - 1;
