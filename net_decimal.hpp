@@ -5,14 +5,14 @@ public:
     // Change the operation mode between modulus and remainder operation - '%'
     bool modulus_mode = false;
 
-    // Default precision of division operation for decimal initialization
-    inline static uint64_t default_division_precision = 64;
+    // Default precision of infinite decimal
+    inline static uint64_t default_infinite_precision = 64;
     
     // Binary bit count for bit operation. If this value is 0, bit count would be changed automatically.
     uint64_t binary_bit_set = 0;
 
-    // Float point digit count for division quotient
-    uint64_t division_precision = default_division_precision;
+    // Float point digit count for infinite decimal
+    uint64_t infinite_precision = default_infinite_precision;
 
     __declspec(property(get = abs))      net_decimal absolute;
     __declspec(property(get = to_float)) long double float_point_format;
@@ -24,7 +24,7 @@ protected:
         red                = src.red;
         modulus_mode       = src.modulus_mode;
         binary_bit_set     = src.binary_bit_set;
-        division_precision = src.division_precision;
+        infinite_precision = src.infinite_precision;
     }
 
     void value_copy(const net_decimal &src) {
@@ -63,6 +63,12 @@ protected:
     }
 
 public:
+    static net_decimal pi(uint64_t places = default_infinite_precision) {
+        net_decimal ans;
+        ans.num = dec_series_pi::value(places);
+        return ans;
+    }
+
     net_decimal() { num = dec_init(sgn, 0); }
     net_decimal(const net_decimal &src) { value_copy(src); }
     net_decimal(net_decimal &&src) { value_move(std::move(src)); }
@@ -99,10 +105,10 @@ public:
     net_decimal ln() const {
         if (dec_is_zero(num) || dec_frac_is_one(num, den) || sgn) return {};
         net_decimal ans;
-        ans.num = dec_series_ln(ans.sgn, num, division_precision);
+        ans.num = dec_series_ln(ans.sgn, num, infinite_precision);
         if (dec_is_zero(den)) return ans;
         auto sgn = false;
-        auto tmp = dec_series_ln(sgn, den, division_precision);
+        auto tmp = dec_series_ln(sgn, den, infinite_precision);
         ans.num  = dec_sub(ans.sgn, ans.num, ans.sgn, ans.den, sgn);
         ans.den.reset();
         return ans;
@@ -111,7 +117,7 @@ public:
     net_decimal exp() const {
         if (dec_is_zero(num)) return {1};
         net_decimal ans;
-        ans.num = dec_series_exp(ans.sgn, num, den, sgn, division_precision);
+        ans.num = dec_series_exp(ans.sgn, num, den, sgn, infinite_precision);
         return ans;
     }
 
@@ -120,7 +126,7 @@ public:
         auto num_term = num,
              den_term = den,
              fra_form = dec_init(ans.sgn, 1);
-        ans.num = dec_series_sin_cos(ans.sgn, num, den, sgn, division_precision, num_term, den_term, fra_form);
+        ans.num = dec_series_sin_cos(ans.sgn, num, den, sgn, infinite_precision, num_term, den_term, fra_form);
         return ans;
     }
 
@@ -129,7 +135,7 @@ public:
         auto num_term = dec_init(ans.sgn, 1),
              den_term = dec_init(ans.sgn, 0),
              fra_form = den_term;
-        ans.num = dec_series_sin_cos(ans.sgn, num, den, sgn, division_precision, num_term, den_term, fra_form);
+        ans.num = dec_series_sin_cos(ans.sgn, num, den, sgn, infinite_precision, num_term, den_term, fra_form);
         return ans;
     }
 
@@ -172,7 +178,7 @@ public:
             if (dec_is_zero(den)) ans.num = dec_init(ans.sgn, 1);
             return ans;
         }
-        ans.num = dec_series_pow(ans.sgn, num, den, sgn, times.num, times.den, times.sgn, division_precision);
+        ans.num = dec_series_pow(ans.sgn, num, den, sgn, times.num, times.den, times.sgn, infinite_precision);
         return ans;
     }
 
@@ -183,7 +189,7 @@ public:
         den.reset();
         modulus_mode       = false;
         binary_bit_set     = 0;
-        division_precision = default_division_precision;
+        infinite_precision = infinite_precision;
     }
 
     ~net_decimal() { reset(); }
@@ -200,13 +206,14 @@ public:
         if (dec_is_zero(den)) {
             if constexpr (std::is_unsigned_v<neunet_dec_type(arg)>) {
                 if (sgn) std::abort();
-                return num.it[0];
+                if (num.it.length) return num.it[0];
+                return 0;
             }
             if constexpr (std::is_integral_v<neunet_dec_type(arg)>) return dec2i(sgn, num);
             return dec2f(sgn, num);
         }
         net_decimal tmp;
-        tmp.num = dec_div(num, den, division_precision);
+        tmp.num = dec_div(num, den, infinite_precision);
         return arg(tmp);
     }
 
@@ -293,13 +300,20 @@ public:
         *this = *this / divr;
         return *this;
     }
-    callback_dec_arg friend arg operator/=(arg &divd, const net_decimal &divr) { return divd /= divr.to_float(); }
+    callback_dec_arg friend arg operator/=(arg &divd, net_decimal &divr) {
+        if (dec_is_zero(divr.den)) return divd /= dec2f(divr.sgn, divr.num);
+        return divd /= divr.to_float();
+    }
 
     friend net_decimal operator%(const net_decimal &divd, const net_decimal &divr) {
         net_decimal ans;
         dec_frac_rem(ans.num, ans.den, divd.num, divd.den, divr.num, divr.den);
-        if (divr.modulus_mode && divr.sgn) ans += divr;
-        if (divd.sgn) ans.sgn = !ans.sgn;
+        if (divr.modulus_mode && divd.sgn != divr.sgn) {
+            if (divr.sgn) ans += divr;
+            else ans = divr - ans;
+            return ans;
+        }
+        ans.sgn = divd.sgn;
         return ans;
     }
     net_decimal &operator%=(const net_decimal &divr) {
@@ -333,7 +347,7 @@ public:
     callback_dec_arg friend arg operator<<=(arg &src, const net_decimal &bit) {
         net_decimal_data bit_cnt;
         if (!dec_frac_bit_verify(bit_cnt, bit.num, bit.den)) return src;
-        if (dec_is_zero(den)) src <<= bit_cnt.it[0];
+        if (dec_is_zero(den) && bit_cnt.it.length) src <<= bit_cnt.it[0];
         return src;
     }
 
@@ -356,7 +370,7 @@ public:
     callback_dec_arg friend arg operator>>=(arg &src, const net_decimal &bit) {
         net_decimal_data bit_cnt;
         if (!dec_frac_bit_verify(bit_cnt, bit.num, bit.den)) return src;
-        if (dec_is_zero(den)) src >>= bit_cnt.it[0];
+        if (dec_is_zero(den) && bit_cnt.it.length) src >>= bit_cnt.it[0];
         return src;
     }
 
@@ -368,7 +382,8 @@ public:
     callback_dec_arg friend arg operator&=(arg &fst, const net_decimal &snd) {
         if (dec_is_zero(snd.den)) {
             if (snd.num.ft.length) return fst;
-            return fst &= snd.num.it[0];
+            if (snd.num.it.length) return fst &= snd.num.it[0];
+            return 0;
         }
         auto tmp = snd.num,
              opt = dec_rem(tmp, snd.den);
@@ -384,11 +399,15 @@ public:
     callback_dec_arg friend arg operator|=(arg &fst, const net_decimal &snd) {
         if (dec_is_zero(snd.den)) {
             if (snd.num.ft.length) return fst;
-            return fst |= snd.num.it[0];
+            if (snd.num.it.length) return fst |= snd.num.it[0];
+            return fst;
         }
         auto tmp = snd.num,
              opt = dec_rem(tmp, snd.den);
-        if (dec_is_zero(tmp) && !tmp.ft.length) return fst |= opt.it[0];
+        if (dec_is_zero(tmp) && !tmp.ft.length) {
+            if (opt.it.length) return fst |= opt.it[0];
+            return fst;
+        }
         return fst;
     }
 
@@ -400,33 +419,37 @@ public:
     callback_dec_arg friend arg operator^=(arg &fst, const net_decimal &snd) {
         if (dec_is_zero(snd.den)) {
             if (snd.num.ft.length) return fst;
-            return fst ^= snd.num.it[0];
+            if (snd.num.it.length) return fst ^= snd.num.it[0];
+            return fst ^= 0;
         }
         auto tmp = snd.num,
              opt = dec_rem(tmp, snd.den);
-        if (dec_is_zero(tmp) && !tmp.ft.length) return fst ^= opt.it[0];
+        if (dec_is_zero(tmp) && !tmp.ft.length) {
+            if (opt.it.length) return fst ^= opt.it[0];
+            return fst ^= 0;
+        }
         return fst;
     }
 
-    net_decimal operator~() const {
-        net_decimal ans;
+    net_decimal operator~() {
         if (dec_is_zero(den)) {
             if (num.ft.length) return *this;
-            ans.num = num;
-            dec_bit_not(ans.num, false, binary_bit_set, sgn);
-            return ans;
+            dec_bit_not(num, false, binary_bit_set, sgn);
+            return *this;
         }
-        auto rm = num;
-        ans.num = dec_rem(rm, den);
-        if (dec_is_zero(rm)) dec_bit_not(ans.num, false, binary_bit_set, sgn);
-        else ans = *this;
-        return ans;
+        auto rem = num,
+             opt = dec_rem(rem, den);
+        if (dec_is_zero(rem)) {
+            num = std::move(opt);
+            dec_bit_not(num, false, binary_bit_set, sgn);
+        }
+        return *this;
     }
 
     friend std::ostream &operator<<(std::ostream &os, const net_decimal &src) {
         if (src.sgn) os << '-';
         if (dec_is_zero(src.den)) return os << src.num;
-        return os << dec_div(src.num, src.den, src.division_precision);
+        return os << dec_div(src.num, src.den, src.infinite_precision);
     }
 };
 

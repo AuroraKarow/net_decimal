@@ -26,9 +26,9 @@ int main(int argc, char *argv[], char *envp[]) {
     
     auto sgn = false;
 
-    net_decimal::default_division_precision = 32;
+    net_decimal::default_infinite_precision = 32;
 
-    cout << ("192831284698325983253481263856325632"_d >> 64_d) << endl;
+    cout << ("192831284698325983253481263856325632"_d << 64_d) << endl;
 
     cout << '\n' << (NEUNET_CHRONO_TIME_POINT - ch_tm_pt) << "ms" << endl;
     return EXIT_SUCCESS;
