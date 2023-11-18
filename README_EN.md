@@ -12,7 +12,7 @@ High precision decimal. This is a calculation library for high precision decimal
 - [Field](wiki/field_en.md)
 - [Operator](wiki/operator_en.md)
 
-The function library includes basic math fucntion such as logarithm, trigonomotric function and power function. Getting properties or altering configration of the decimal via access field could change the calculation precision, decimal absolute value and more. Operator library include basic operator as well as bitwise operators.
+The function library includes basic math function such as logarithm, trigonomotric function and power function. Getting properties or altering configration of the decimal via access field could change the calculation precision, decimal absolute value and more. Operator library includes basic operator as well as bitwise operators.
 
 Thanks developers
 
