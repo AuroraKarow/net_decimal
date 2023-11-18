@@ -22,8 +22,8 @@ Absolute value of current number. Property.
 
 ## `float_point_format`
 
-The `long double` type of current number. It would meet truncating error when the significant figures of current number surpass the `long double` type. Property.
+The `long double` type of current number. It would meet truncating error when the significant figure of current number surpasses the `long double` type. Property.
 
 ## `integer_format`
 
-The `int64_t` type of current number. It would meet truncating error when the significant figures of current number surpass the `int64_t` type. Property.
+The `int64_t` type of current number. It would meet truncating error when the significant figure of current number surpasses the `int64_t` type. Property.

@@ -118,7 +118,7 @@ cout << i144 << endl;
 
 `%` `%=`
 
-Operator for remainder or modulo, operands are integer.
+Remainder or modulo, operands are integer.
 
 ```C++
 using namespace std;

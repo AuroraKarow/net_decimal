@@ -2,7 +2,7 @@
 
 ## Constructor
 
-Constructors include direct, blank and copy & move constructing.
+Constructors include direct, blank and copy & move constructors.
 
 ```C++
 // blank constructor
@@ -68,7 +68,7 @@ cout << log(2_d) << endl;
 
 Get power of current number with base number $e$ .
 
-Return the value of function $\exp{x}$ the $e^x$ , $x$ is current number.
+Return the value of function $\exp{x}$ , the $e^x$ , $x$ is current number.
 
 Need $e^{2.16}$ and print it.
 
@@ -114,7 +114,7 @@ Parameters|IO|Description
 
 Return the value of $x^y$ , $x$ is base, $y$ is times.
 
-Need $(-32) ^ {0.2}$ ans print it.
+Need $(-32) ^ {0.2}$ and print it.
 
 ```C++
 using namespace std;
