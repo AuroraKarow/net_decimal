@@ -1,6 +1,6 @@
 # `net_decimal`
 
-[![GPL-3.0 license](https://badgen.net/badge/License/GPL3/red)](...)
+[![GPL-3.0 license](https://badgen.net/badge/License/GPL3/red)](LICENSE)
 [![Download](https://badgen.net/badge/DownloadZip/v.0.96beta/green)](https://github.com/AuroraKarow/net_decimal/archive/refs/heads/main.zip)
 [![TensorLab](https://badgen.net/badge/github/TensorLabX?icon=github&color=purple)](https://github.com/AuroraKarow/TensorLabX)
 
