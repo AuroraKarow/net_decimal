@@ -33,22 +33,15 @@
 #define NEUNET_DEC_BIN_AND          0x0001
 #define NEUNET_DEC_BIN_XOR          0x0002
 
-#define neunet_t_arr_len(type, arg) type[sizeof(arg) / sizeof(type)]
-
 #define neunet_dec_init_expr        std::is_arithmetic_v<arg> ||\
-                                    std::is_same_v<arg, neunet_t_arr_len(char, arg)> ||\
-                                    std::is_same_v<std::string, arg>,\
-                                    "A arithmetic or string type value is needed."
+                                    std::is_same_v<arg, char[sizeof(arg) / sizeof(char)]> ||\
+                                    std::is_same_v<std::string, arg>, "A arithmetic or string type value is needed."
 
 #define neunet_dec_type(type)       std::remove_reference_t<type>
-#define neunet_dec_num(type)        std::is_arithmetic_v<\
-                                    neunet_dec_type(type)>
+#define neunet_dec_num(type)        std::is_arithmetic_v<neunet_dec_type(type)>
 
 #define neunet_number_arg           neunet_dec_num(arg)
 #define neunet_dec_enable(expr)     = std::enable_if_t<expr>
-#define callback_dec_arg            template<typename arg,\
-                                             typename neunet_dec_enable\
-                                                      (neunet_number_arg)>
 
 #define neunet_dec_loop             while (true)
 

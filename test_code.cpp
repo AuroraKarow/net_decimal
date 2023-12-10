@@ -168,7 +168,8 @@ void dec_rsh(net_decimal_data &src, uint64_t bit) {
 
 /* obsolete division */ // TODO: DIVISION
 
-callback_dec_arg uint8_t dec_carry(int64_t &carry, const arg &coe) {
+template <typename arg, typename neunet_dec_enable(neunet_number_arg)>
+uint8_t dec_carry(int64_t &carry, const arg &coe) {
     auto tmp = carry + coe;
     carry    = 0;
     if (tmp < 0) while (tmp < 0) {
@@ -188,7 +189,8 @@ void dec_coe_seg(net_set<uint64_t> &ans_coe, bool is_it, uint64_t &ans_idx, uint
     pow_cnt = 1;
 } }
 
-callback_dec_arg void dec_coe(net_set<arg> &dest, uint64_t &idx, const net_set<uint64_t> &seg_set, bool is_it) { for (auto i = is_it ? 0 : seg_set.length; is_it ? (i < seg_set.length) : i; is_it ? ++i : --i) {
+template <typename arg, typename neunet_dec_enable(neunet_number_arg)>
+void dec_coe(net_set<arg> &dest, uint64_t &idx, const net_set<uint64_t> &seg_set, bool is_it) { for (auto i = is_it ? 0 : seg_set.length; is_it ? (i < seg_set.length) : i; is_it ? ++i : --i) {
     uint64_t seg_tmp = seg_set[is_it ? i : (i - 1)],
              seg_dig = NEUNET_DEC_DIG_MAX;
     if (i == seg_set.length) while (!(seg_tmp % 10)) {
@@ -207,13 +209,15 @@ callback_dec_arg void dec_coe(net_set<arg> &dest, uint64_t &idx, const net_set<u
     }
 } }
 // from high digit
-callback_dec_arg void dec_coe(net_set<arg> &dest, const net_decimal_data &src) {
+template <typename arg, typename neunet_dec_enable(neunet_number_arg)>
+void dec_coe(net_set<arg> &dest, const net_decimal_data &src) {
     auto idx = dest.length;
     dec_coe(dest, idx, src.ft, false);
     dec_coe(dest, idx, src.it, true);
 }
 // coefficient ordering from high digit
-callback_dec_arg net_decimal_data dec_coe(const net_set<arg> &src, uint64_t ft_cnt) {
+template <typename arg, typename neunet_dec_enable(neunet_number_arg)>
+net_decimal_data dec_coe(const net_set<arg> &src, uint64_t ft_cnt) {
     auto idx_tmp = src.length;
     auto carry   = 0ll;
     while (ft_cnt && !src[idx_tmp - 1]) {

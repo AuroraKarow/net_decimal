@@ -202,7 +202,8 @@ protected:
          red = true;
 
 public:
-    callback_dec_arg explicit operator arg() const {
+    template <typename arg, typename neunet_dec_enable(neunet_number_arg)>
+    explicit operator arg() const {
         if (dec_is_zero(den)) {
             if constexpr (std::is_unsigned_v<neunet_dec_type(arg)>) {
                 if (sgn) std::abort();
@@ -245,7 +246,8 @@ public:
         *this = *this + snd;
         return *this;
     }
-    callback_dec_arg friend void operator+=(arg &fst, const net_decimal &snd) { fst += snd.to_float(); }
+    template <typename arg, typename neunet_dec_enable(neunet_number_arg)>
+    friend void operator+=(arg &fst, const net_decimal &snd) { fst += snd.to_float(); }
     net_decimal &operator++() {
         *this += 1;
         return *this;
@@ -267,7 +269,8 @@ public:
         *this = *this - snd;
         return *this;
     }
-    callback_dec_arg friend arg operator-=(arg &fst, const net_decimal &snd) { return fst -= snd.to_float(); }
+    template <typename arg, typename neunet_dec_enable(neunet_number_arg)>
+    friend arg operator-=(arg &fst, const net_decimal &snd) { return fst -= snd.to_float(); }
     net_decimal &operator--() {
         *this -= 1;
         return *this;
@@ -288,7 +291,8 @@ public:
         *this = *this * snd;
         return *this;
     }
-    callback_dec_arg friend arg operator*=(arg &fst, const net_decimal &snd) { return fst *= snd.to_float(); }
+    template <typename arg, typename neunet_dec_enable(neunet_number_arg)>
+    friend arg operator*=(arg &fst, const net_decimal &snd) { return fst *= snd.to_float(); }
 
     friend net_decimal operator/(const net_decimal &divd, const net_decimal &divr) {
         net_decimal ans;
@@ -300,7 +304,8 @@ public:
         *this = *this / divr;
         return *this;
     }
-    callback_dec_arg friend arg operator/=(arg &divd, net_decimal &divr) {
+    template <typename arg, typename neunet_dec_enable(neunet_number_arg)>
+    friend arg operator/=(arg &divd, net_decimal &divr) {
         if (dec_is_zero(divr.den)) return divd /= dec2f(divr.sgn, divr.num);
         return divd /= divr.to_float();
     }
@@ -320,7 +325,8 @@ public:
         *this = *this % divr;
         return *this;
     }
-    callback_dec_arg friend arg operator%=(arg &divd, const net_decimal &divr) {
+    template <typename arg, typename neunet_dec_enable(neunet_number_arg)>
+    friend arg operator%=(arg &divd, const net_decimal &divr) {
         auto divr_int = divr.to_int();
         divd         %= divr_int;
         if (divr.modulus_mode && divr.sgn) divd += divr_int;
@@ -344,7 +350,8 @@ public:
         if (dec_frac_bit_verify(bit_cnt.num, bit.num, bit.den)) return *this <<= bit_cnt;
         return *this;
     }
-    callback_dec_arg friend arg operator<<=(arg &src, const net_decimal &bit) {
+    template <typename arg, typename neunet_dec_enable(neunet_number_arg)>
+    friend arg operator<<=(arg &src, const net_decimal &bit) {
         net_decimal_data bit_cnt;
         if (!dec_frac_bit_verify(bit_cnt, bit.num, bit.den)) return src;
         if (dec_is_zero(den) && bit_cnt.it.length) src <<= bit_cnt.it[0];
@@ -367,7 +374,8 @@ public:
         if (dec_frac_bit_verify(bit_cnt.num, bit.num, bit.den)) return *this >>= bit_cnt;
         return *this;
     }
-    callback_dec_arg friend arg operator>>=(arg &src, const net_decimal &bit) {
+    template <typename arg, typename neunet_dec_enable(neunet_number_arg)>
+    friend arg operator>>=(arg &src, const net_decimal &bit) {
         net_decimal_data bit_cnt;
         if (!dec_frac_bit_verify(bit_cnt, bit.num, bit.den)) return src;
         if (dec_is_zero(den) && bit_cnt.it.length) src >>= bit_cnt.it[0];
@@ -379,7 +387,8 @@ public:
         *this = *this & snd;
         return *this;
     }
-    callback_dec_arg friend arg operator&=(arg &fst, const net_decimal &snd) {
+    template <typename arg, typename neunet_dec_enable(neunet_number_arg)>
+    friend arg operator&=(arg &fst, const net_decimal &snd) {
         if (dec_is_zero(snd.den)) {
             if (snd.num.ft.length) return fst;
             if (snd.num.it.length) return fst &= snd.num.it[0];
@@ -396,7 +405,8 @@ public:
         *this = *this | snd;
         return *this;
     }
-    callback_dec_arg friend arg operator|=(arg &fst, const net_decimal &snd) {
+    template <typename arg, typename neunet_dec_enable(neunet_number_arg)>
+    friend arg operator|=(arg &fst, const net_decimal &snd) {
         if (dec_is_zero(snd.den)) {
             if (snd.num.ft.length) return fst;
             if (snd.num.it.length) return fst |= snd.num.it[0];
@@ -416,7 +426,8 @@ public:
         *this = *this ^ snd;
         return *this;
     }
-    callback_dec_arg friend arg operator^=(arg &fst, const net_decimal &snd) {
+    template <typename arg, typename neunet_dec_enable(neunet_number_arg)>
+    friend arg operator^=(arg &fst, const net_decimal &snd) {
         if (dec_is_zero(snd.den)) {
             if (snd.num.ft.length) return fst;
             if (snd.num.it.length) return fst ^= snd.num.it[0];
