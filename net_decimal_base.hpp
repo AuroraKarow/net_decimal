@@ -73,7 +73,7 @@ net_decimal_data dec_bit_k1(bool sgn = false) { return dec_init(sgn, 1); }
  */
 void dec_bit_lsh(net_decimal_data &src, uint64_t bit = 1, bool sta = false){
     if (src.ft.length || !src.it.length) return;
-    if (!(src.it.length - 1) && log(src.it[0]) + bit < 64) { src.it[0] <<= bit; return; }
+    if (!(src.it.length - 1) && std::log(src.it[0]) + bit < 64) { src.it[0] <<= bit; return; }
     uint64_t b = bit % NEUNET_DEC_DIG_MAX,
              B = bit / NEUNET_DEC_DIG_MAX,
              l = src.it.length,
@@ -117,7 +117,7 @@ void dec_bit_lsh(net_decimal_data &src, uint64_t bit = 1, bool sta = false){
 }
 void dec_bit_lsh(net_decimal_data &src, net_decimal_data bit, bool sta = false){
     if (src.ft.length || !src.it.length || bit.ft.length || !bit.it.length) return;
-    if (!(src.it.length - 1) && !(bit.it.length - 1) && log(src.it[0]) + bit.it[0] < 64) { src.it[0] <<= bit.it[0]; return; }
+    if (!(src.it.length - 1) && !(bit.it.length - 1) && std::log(src.it[0]) + bit.it[0] < 64) { src.it[0] <<= bit.it[0]; return; }
     bool sgn = false;
     if (!(bit.it.length - 1)){
         dec_bit_lsh(src, bit.it[0]);
