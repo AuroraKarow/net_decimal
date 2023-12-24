@@ -728,7 +728,7 @@ public: static net_decimal_data value(uint64_t precision) {
         // ++iter_cnt;
         num_term = dec_mul(num_term, num_form);
         den_term = dec_add(den_term, den_form);
-    } while (dec_series_check(num_term, den_term, prec));
+    } while (dec_series_check(num_term, den_term, precision));
     prec = precision;
     ans  = dec_mul(den_form, dec_div(num, den, prec));
     // std::cout << "next ln4 - " << iter_cnt << std::endl;
