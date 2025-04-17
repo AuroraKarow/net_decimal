@@ -23,7 +23,7 @@ Specify the decimal place to keep, get Pi $\pi$ approximation.
 
 Parameters|IO|Description|Default value
 -|-|-|-
-`places`|*In*|Decimal spaces for $\pi$ to keep.|[`default_infinite_precision`](field.md/#default_infinite_precision)
+`places`|*In*|Decimal spaces for $\pi$ to keep.|[`default_infinite_precision`](field_en.md/#default_infinite_precision)
 
 Return the approximation of $\pi$ .
 
@@ -121,4 +121,4 @@ using namespace std;
 cout << pow(-32_d, 0.2_d) << endl;
 ```
 
-*For more information about the precision of printing value, please refer to field* [`infinite_precision`](field.md/#infinite_precision) *.*
+*For more information about the precision of printing value, please refer to field* [`infinite_precision`](field_en.md/#infinite_precision) *.*
